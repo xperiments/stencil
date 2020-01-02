@@ -37,13 +37,26 @@ export const bundleOutput = async (config: d.Config, compilerCtx: d.CompilerCtx,
   return undefined;
 };
 
+let nodeResolve: any;
+
+const getNodeResolve = (config: d.Config, compilerCtx: d.CompilerCtx) => {
+  if (!nodeResolve) {
+    const customResolveOptions = createCustomResolverAsync(
+      config,
+      compilerCtx.fs,
+      ['.tsx', '.ts', '.js', '.mjs', '.json']
+    );
+
+    nodeResolve = rollupNodeResolvePlugin({
+      mainFields: ['browser', 'collection:main', 'jsnext:main', 'es2017', 'es2015', 'module', 'main'],
+      customResolveOptions,
+      ...config.nodeResolve as any
+    });
+  }
+  return nodeResolve;
+}
 
 export const getRollupOptions = (config: d.Config, compilerCtx: d.CompilerCtx, buildCtx: d.BuildCtx, bundleOpts: BundleOptions) => {
-  const customResolveOptions = createCustomResolverAsync(
-    config,
-    compilerCtx.fs,
-    ['.tsx', '.ts', '.js', '.mjs', '.json']
-  );
 
   const rollupOptions: RollupOptions = {
 
@@ -61,11 +74,7 @@ export const getRollupOptions = (config: d.Config, compilerCtx: d.CompilerCtx, b
       extTransformsPlugin(config, compilerCtx, buildCtx),
       workerPlugin(config, compilerCtx, buildCtx, bundleOpts.platform),
       ...config.rollupPlugins,
-      rollupNodeResolvePlugin({
-        mainFields: ['browser', 'collection:main', 'jsnext:main', 'es2017', 'es2015', 'module', 'main'],
-        customResolveOptions,
-        ...config.nodeResolve as any
-      }),
+      getNodeResolve(config, compilerCtx),
       rollupCommonjsPlugin({
         include: /node_modules/,
         sourceMap: config.sourceMap,
