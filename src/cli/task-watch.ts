@@ -54,6 +54,6 @@ export const taskWatch = async (coreCompiler: CoreCompiler, config: Config) => {
   }
 
   if (exitCode > 0) {
-    config.sys.exit(exitCode);
+    return config.sys.exit(exitCode);
   }
 };
