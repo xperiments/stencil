@@ -4,15 +4,12 @@
   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
-
     {
       "type": "node",
       "request": "launch",
       "name": "Jest All",
       "program": "${workspaceFolder}/node_modules/.bin/jest",
-      "args": [
-        "--runInBand"
-      ],
+      "args": ["--runInBand"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "disableOptimisticBPs": true
@@ -22,10 +19,7 @@
       "request": "launch",
       "name": "Jest File",
       "program": "${workspaceFolder}/node_modules/.bin/jest",
-      "args": [
-        "--runInBand",
-        "src/runtime/test/style.spec.tsx"
-      ],
+      "args": ["--runInBand", "src/runtime/test/style.spec.tsx"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "disableOptimisticBPs": true
@@ -35,9 +29,7 @@
       "request": "launch",
       "name": "Jest Current File",
       "program": "${workspaceFolder}/node_modules/.bin/jest",
-      "args": [
-        "${relativeFile}"
-      ],
+      "args": ["${relativeFile}"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "disableOptimisticBPs": true
@@ -62,9 +54,7 @@
       "type": "node",
       "request": "launch",
       "name": "Hello World Prerender",
-      "args": [
-        "${workspaceFolder}/test/hello-world/prerender.js"
-      ],
+      "args": ["${workspaceFolder}/test/hello-world/prerender.js"],
       "protocol": "inspector"
     },
     {
@@ -215,6 +205,24 @@
     {
       "type": "node",
       "request": "launch",
+      "name": "SSG Dev",
+      "args": [
+        "${workspaceFolder}/bin/stencil",
+        "build",
+        "--dev",
+        "--watch",
+        "--serve",
+        "--prerender",
+        "--no-open",
+        "--max-workers=0",
+        "--config",
+        "${workspaceFolder}/test/ssg/stencil.config.ts"
+      ],
+      "protocol": "inspector"
+    },
+    {
+      "type": "node",
+      "request": "launch",
       "name": "Ionic Docs Prerender",
       "args": [
         "${workspaceFolder}/bin/stencil",
@@ -245,9 +253,7 @@
       "type": "node",
       "request": "launch",
       "name": "Karma Prerender",
-      "args": [
-        "${workspaceFolder}/test/karma/test-prerender/prerender.js"
-      ],
+      "args": ["${workspaceFolder}/test/karma/test-prerender/prerender.js"],
       "protocol": "inspector"
     }
   ]
