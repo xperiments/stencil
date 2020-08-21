@@ -72,6 +72,12 @@ export const validateDevServer = (config: d.Config, diagnostics: d.Diagnostic[])
     devServer.websocket = true;
   }
 
+  if (!isBoolean(devServer.ssr)) {
+    devServer.ssr = !!flags.ssr;
+  }
+
+  devServer.srcIndexHtml = config.srcIndexHtml;
+
   if (devServer.protocol !== 'http' && devServer.protocol !== 'https') {
     devServer.protocol = devServer.https ? 'https' : addressProtocol ? addressProtocol : 'http';
   }

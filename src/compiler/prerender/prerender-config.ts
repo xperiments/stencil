@@ -1,5 +1,5 @@
 import type * as d from '../../declarations';
-import { catchError, loadTypeScriptDiagnostics } from '@utils';
+import { catchError, isString, loadTypeScriptDiagnostics } from '@utils';
 import { IS_NODE_ENV, requireFunc } from '../sys/environment';
 import { resolve } from 'path';
 import ts from 'typescript';
@@ -7,7 +7,7 @@ import ts from 'typescript';
 export const getPrerenderConfig = (diagnostics: d.Diagnostic[], prerenderConfigPath: string) => {
   const prerenderConfig: d.PrerenderConfig = {};
 
-  if (typeof prerenderConfigPath === 'string') {
+  if (isString(prerenderConfigPath)) {
     if (IS_NODE_ENV) {
       const userPrerenderConfig = nodeRequireTsConfig(diagnostics, prerenderConfigPath);
       if (userPrerenderConfig) {

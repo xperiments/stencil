@@ -1,42 +1,70 @@
 import type * as d from '../declarations';
 import type { ServerResponse } from 'http';
-import { responseHeaders, sendLogRequest } from './dev-server-utils';
-import { serve500 } from './serve-500';
+import { responseHeaders } from './dev-server-utils';
 import { appendDevServerClientScript } from './serve-file';
+import { isString } from 'util';
+import { catchError } from '@utils';
 
 export async function ssrRequest(
   devServerConfig: d.DevServerConfig,
-  sys: d.CompilerSystem,
+  serverCtx: d.DevServerContext,
   req: d.HttpRequest,
   res: ServerResponse,
-  sendMsg: d.DevServerSendMessage,
 ) {
+  const diagnostics: d.Diagnostic[] = [];
   try {
+    let status = 500;
     let content = '';
 
-    const coreCompiler = await import('@stencil/core/compiler');
+    const buildResults = await serverCtx.getBuildResults();
 
-    const config: d.Config = {};
-
-    const prerenderer = await coreCompiler.createPrerenderer(config);
-
-    const results = await prerenderer.start({
-      hydrateAppFilePath,
-      componentGraph,
-      srcIndexHtmlPath,
-    });
-
-    if (results.diagnostics.length > 0) {
-      content = getSsrErrorContent(results.diagnostics);
+    if (!isString(buildResults.hydrateAppFilePath)) {
+      diagnostics.push({ messageText: `Missing hydrateAppFilePath`, level: `error`, type: `ssr` });
+    } else if (!isString(devServerConfig.srcIndexHtml)) {
+      diagnostics.push({ messageText: `Missing srcIndexHtml`, level: `error`, type: `ssr` });
     } else {
+      try {
+        const srcIndexHtml = await serverCtx.sys.readFile(devServerConfig.srcIndexHtml);
+        if (!isString(srcIndexHtml)) {
+          diagnostics.push({
+            messageText: `Unable to load src index html: ${devServerConfig.srcIndexHtml}`,
+            level: `error`,
+            type: `ssr`,
+          });
+        } else {
+          const hydrateApp: HydrateApp = require(buildResults.hydrateAppFilePath);
+
+          const opts: d.SerializeDocumentOptions = {
+            prettyHtml: true,
+            url: req.url.href,
+          };
+
+          const ssrResults = await hydrateApp.renderToString(srcIndexHtml, opts);
+
+          if (ssrResults.diagnostics.length > 0) {
+            diagnostics.push(...ssrResults.diagnostics);
+          } else {
+            status = ssrResults.httpStatus;
+            content = ssrResults.html;
+          }
+        }
+      } catch (e) {
+        catchError(diagnostics, e);
+      }
+    }
+
+    if (diagnostics.length > 0) {
+      content = getSsrErrorContent(diagnostics);
     }
 
     if (devServerConfig.websocket) {
       content = appendDevServerClientScript(devServerConfig, req, content);
     }
 
+    serverCtx.logRequest(req, status);
+
     res.writeHead(
-      200,
+      status,
       responseHeaders({
         'content-type': 'text/html; charset=utf-8',
         'content-length': Buffer.byteLength(content, 'utf8'),
@@ -45,7 +73,7 @@ export async function ssrRequest(
     res.write(content);
     res.end();
   } catch (e) {
-    serve500(devServerConfig, req, res, e, 'ssrRequest', sendMsg);
+    serverCtx.serve500(req, res, e, `ssrRequest`);
   }
 }
 
@@ -61,7 +89,7 @@ function getSsrErrorContent(diagnostics: d.Diagnostic[]) {
     </style>
   </head>
   <body>
-      <h1>SSR Error</h1>
+    <h1>SSR Dev Error</h1>
     ${diagnostics.map(
       diagnostic =>
         `
@@ -74,3 +102,7 @@ function getSsrErrorContent(diagnostics: d.Diagnostic[]) {
 </html>
 `;
 }
+
+type HydrateApp = {
+  renderToString: (html: string, options: d.SerializeDocumentOptions) => Promise<d.HydrateResults>;
+};

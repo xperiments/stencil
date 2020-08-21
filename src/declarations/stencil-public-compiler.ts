@@ -429,6 +429,7 @@ export interface DevServerConfig extends StencilDevServerConfig {
   historyApiFallback?: HistoryApiFallback;
   openBrowser?: boolean;
   protocol?: 'http' | 'https';
+  srcIndexHtml?: string;
 }
 
 export interface HistoryApiFallback {

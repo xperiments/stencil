@@ -1033,6 +1033,18 @@ export interface DevServerMessage {
 
 export type DevServerSendMessage = (msg: DevServerMessage) => void;
 
+export interface DevServerContext {
+  connectorHtml: string;
+  dirTemplate: string;
+  getBuildResults: () => Promise<CompilerBuildResults>;
+  getCompilerRequest: (path: string) => Promise<CompilerRequestResponse>;
+  logRequest: (req: { method: string; pathname?: string }, status: number) => void;
+  serve302: (req: any, res: any, pathname?: string) => void;
+  serve404: (req: any, res: any, xSource: string, content?: string) => void;
+  serve500: (req: any, res: any, error: any, xSource: string) => void;
+  sys: CompilerSystem;
+}
+
 export type InitServerProcess = (sendMsg: (msg: DevServerMessage) => void) => (msg: DevServerMessage) => void;
 
 export interface DevResponseHeaders {

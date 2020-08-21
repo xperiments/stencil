@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "build": "node ../../bin/stencil build --prerender",
-    "start": "node ../../bin/stencil build --dev --watch --serve --prerender"
+    "start": "node ../../bin/stencil build --dev --watch --serve --ssr"
   },
   "devDependencies": {
     "stencil-router-v2": "^0.5.1-0"

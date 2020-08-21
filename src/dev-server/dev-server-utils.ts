@@ -110,20 +110,3 @@ export function shouldCompress(devServerConfig: d.DevServerConfig, req: d.HttpRe
 
   return true;
 }
-
-export function sendLogRequest(
-  devServerConfig: d.DevServerConfig,
-  req: d.HttpRequest,
-  status: number,
-  sendMsg: d.DevServerSendMessage,
-) {
-  if (devServerConfig.logRequests) {
-    sendMsg({
-      requestLog: {
-        method: req.method,
-        url: req.pathname,
-        status,
-      },
-    });
-  }
-}

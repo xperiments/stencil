@@ -34,7 +34,14 @@ describe('validateOutputTargetWww', () => {
         serviceWorker: {
           dontCacheBustURLsMatching: /p-\w{8}/,
           globDirectory: path.join(rootDir, 'www', 'docs'),
-          globIgnores: ['**/host.config.json', '**/*.system.entry.js', '**/*.system.js', '**/app.js', '**/app.esm.js', '**/app.css'],
+          globIgnores: [
+            '**/host.config.json',
+            '**/*.system.entry.js',
+            '**/*.system.js',
+            '**/app.js',
+            '**/app.esm.js',
+            '**/app.css',
+          ],
           globPatterns: ['*.html', '**/*.{js,css,json}'],
           swDest: path.join(rootDir, 'www', 'docs', 'sw.js'),
         },
@@ -280,6 +287,51 @@ describe('validateOutputTargetWww', () => {
           type: 'copy',
         },
       ]);
+    });
+  });
+
+  describe('dist-hydrate-script', () => {
+    it('should not add hydrate by default', () => {
+      const { config } = validateConfig(userConfig);
+      expect(config.outputTargets.some(o => o.type === 'dist-hydrate-script')).toBe(false);
+      expect(config.outputTargets.some(o => o.type === 'www')).toBe(true);
+    });
+
+    it('should not add hydrate with user www', () => {
+      const wwwOutputTarget: d.OutputTargetWww = {
+        type: 'www',
+      };
+      userConfig.outputTargets = [wwwOutputTarget];
+      const { config } = validateConfig(userConfig);
+      expect(config.outputTargets.some(o => o.type === 'dist-hydrate-script')).toBe(false);
+      expect(config.outputTargets.some(o => o.type === 'www')).toBe(true);
+    });
+
+    it('should add hydrate with user hydrate and www outputs', () => {
+      const wwwOutputTarget: d.OutputTargetWww = {
+        type: 'www',
+      };
+      const hydrateOutputTarget: d.OutputTargetHydrate = {
+        type: 'dist-hydrate-script',
+      };
+      userConfig.outputTargets = [wwwOutputTarget, hydrateOutputTarget];
+      const { config } = validateConfig(userConfig);
+      expect(config.outputTargets.some(o => o.type === 'dist-hydrate-script')).toBe(true);
+      expect(config.outputTargets.some(o => o.type === 'www')).toBe(true);
+    });
+
+    it('should add hydrate with --prerender flag', () => {
+      userConfig.flags.prerender = true;
+      const { config } = validateConfig(userConfig);
+      expect(config.outputTargets.some(o => o.type === 'dist-hydrate-script')).toBe(true);
+      expect(config.outputTargets.some(o => o.type === 'www')).toBe(true);
+    });
+
+    it('should add hydrate with --ssr flag', () => {
+      userConfig.flags.ssr = true;
+      const { config } = validateConfig(userConfig);
+      expect(config.outputTargets.some(o => o.type === 'dist-hydrate-script')).toBe(true);
+      expect(config.outputTargets.some(o => o.type === 'www')).toBe(true);
     });
   });
 });
