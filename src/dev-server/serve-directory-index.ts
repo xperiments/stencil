@@ -4,6 +4,7 @@ import { responseHeaders, sendLogRequest } from './dev-server-utils';
 import { serve404 } from './serve-404';
 import { serve500 } from './serve-500';
 import { serveFile } from './serve-file';
+import { ssrRequest } from './ssr-request';
 import path from 'path';
 
 let dirTemplate: string = null;
@@ -16,8 +17,11 @@ export async function serveDirectoryIndex(
   sendMsg: d.DevServerSendMessage,
 ) {
   try {
-    const indexFilePath = path.join(req.filePath, 'index.html');
+    if (devServerConfig.ssr) {
+      return ssrRequest(devServerConfig, sys, req, res, sendMsg);
+    }
 
+    const indexFilePath = path.join(req.filePath, 'index.html');
     req.stats = await sys.stat(indexFilePath);
     if (req.stats.isFile) {
       req.filePath = indexFilePath;

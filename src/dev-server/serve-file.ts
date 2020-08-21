@@ -107,7 +107,7 @@ function updateStyleUrls(url: URL, oldCss: string) {
 
 const urlVersionIds = new Map<string, string>();
 
-function appendDevServerClientScript(devServerConfig: d.DevServerConfig, req: d.HttpRequest, content: string) {
+export function appendDevServerClientScript(devServerConfig: d.DevServerConfig, req: d.HttpRequest, content: string) {
   const devServerClientUrl = util.getDevServerClientUrl(
     devServerConfig,
     req.headers?.['x-forwarded-host'] ?? req.host,
