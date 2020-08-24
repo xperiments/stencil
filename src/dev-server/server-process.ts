@@ -135,6 +135,7 @@ export function initServerProcess(sendMsg: d.DevServerSendMessage) {
     getBuildResults,
     getCompilerRequest,
     logRequest,
+    prerenderConfig: null,
     serve302,
     serve404,
     serve500,

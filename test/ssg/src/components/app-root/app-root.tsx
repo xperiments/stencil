@@ -1,7 +1,7 @@
 import { Component, Host, h } from '@stencil/core';
-import { Route, href, match, staticState } from 'stencil-router-v2';
+import { Route, href, match, staticState } from '../../stencil-router';
 import { Router } from '../../router';
-import { getBlog } from '../../data';
+import { getBlog, getBlogs, BlogData } from '../../data.server';
 
 @Component({
   tag: 'app-root',
@@ -13,17 +13,24 @@ export class AppRoot {
         <Router.Switch>
           <Route path="/log-in" to="/account" />
 
-          <Route path="/blogs">
-            <h1>Blogs</h1>
-            <ul>
-              <li>
-                <a {...href('/blog/static-site-generation')}>SSG</a>
-              </li>
-              <li>
-                <a {...href('/blog/server-side-rendering')}>SSR</a>
-              </li>
-            </ul>
-          </Route>
+          <Route
+            path="/blogs"
+            mapParams={staticState(getBlogs)}
+            render={(blogData: BlogData[]) => {
+              return (
+                <div>
+                  <h1>Blogs!</h1>
+                  <ul>
+                    {blogData.map(blog => (
+                      <li>
+                        <a {...href(`/blog/${blog.id}`)}>{blog.title}</a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            }}
+          />
 
           <Route
             path={match('/blog/:id')}

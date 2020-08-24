@@ -1,12 +1,12 @@
 import type * as d from '../declarations';
 import type { IncomingMessage, ServerResponse } from 'http';
-import { isDevClient, isDevModule } from './dev-server-utils';
+import { isDevClient, isDevModule, isExtensionLessPath, isSsrStaticDataPath } from './dev-server-utils';
 import { normalizePath } from '@utils';
 import { serveDevClient } from './serve-dev-client';
 import { serveDevNodeModule } from './serve-dev-node-module';
 import { serveDirectoryIndex } from './serve-directory-index';
 import { serveFile } from './serve-file';
-import { ssrRequest } from './ssr-request';
+import { ssrPageRequest, ssrStaticDataRequest } from './ssr-request';
 import path from 'path';
 
 export function createRequestHandler(devServerConfig: d.DevServerConfig, serverCtx: d.DevServerContext) {
@@ -35,15 +35,21 @@ export function createRequestHandler(devServerConfig: d.DevServerConfig, serverC
         );
       }
 
+      if (devServerConfig.ssr) {
+        if (isExtensionLessPath(req.url.pathname)) {
+          return ssrPageRequest(devServerConfig, serverCtx, req, res);
+        }
+        if (isSsrStaticDataPath(req.url.pathname)) {
+          return ssrStaticDataRequest(devServerConfig, serverCtx, req, res);
+        }
+      }
+
       req.stats = await serverCtx.sys.stat(req.filePath);
       if (req.stats.isFile) {
         return serveFile(devServerConfig, serverCtx, req, res);
       }
 
       if (req.stats.isDirectory) {
-        if (devServerConfig.ssr) {
-          return ssrRequest(devServerConfig, serverCtx, req, res);
-        }
         return serveDirectoryIndex(devServerConfig, serverCtx, req, res);
       }
 
@@ -75,13 +81,14 @@ export function createRequestHandler(devServerConfig: d.DevServerConfig, serverC
 
 export function isValidUrlBasePath(basePath: string, url: URL) {
   // normalize the paths to always end with a slash for the check
-  if (!url.pathname.endsWith('/')) {
-    url.pathname += '/';
+  let pathname = url.pathname;
+  if (!pathname.endsWith('/')) {
+    pathname += '/';
   }
   if (!basePath.endsWith('/')) {
     basePath += '/';
   }
-  return url.pathname.startsWith(basePath);
+  return pathname.startsWith(basePath);
 }
 
 function normalizeHttpRequest(devServerConfig: d.DevServerConfig, incomingReq: IncomingMessage) {

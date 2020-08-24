@@ -1,4 +1,9 @@
-import type { HydrateDocumentOptions, HydrateFactoryOptions, HydrateResults, SerializeDocumentOptions } from '../../declarations';
+import type {
+  HydrateDocumentOptions,
+  HydrateFactoryOptions,
+  HydrateResults,
+  SerializeDocumentOptions,
+} from '../../declarations';
 import { generateHydrateResults, normalizeHydrateOptions, renderBuildError, renderCatchError } from './render-utils';
 import { hasError, isPromise } from '@utils';
 import { hydrateFactory } from '@hydrate-factory';
@@ -80,7 +85,12 @@ export function hydrateDocument(doc: any | string, options?: HydrateDocumentOpti
   });
 }
 
-function render(win: Window & typeof globalThis, opts: HydrateFactoryOptions, results: HydrateResults, resolve: (results: HydrateResults) => void) {
+function render(
+  win: Window & typeof globalThis,
+  opts: HydrateFactoryOptions,
+  results: HydrateResults,
+  resolve: (results: HydrateResults) => void,
+) {
   if (!(process as any).__stencilErrors) {
     (process as any).__stencilErrors = true;
 
@@ -89,7 +99,7 @@ function render(win: Window & typeof globalThis, opts: HydrateFactoryOptions, re
     });
   }
 
-  initializeWindow(win, opts, results);
+  initializeWindow(win, win.document, opts, results);
 
   if (typeof opts.beforeHydrate === 'function') {
     try {
@@ -110,7 +120,12 @@ function render(win: Window & typeof globalThis, opts: HydrateFactoryOptions, re
   }
 }
 
-function afterHydrate(win: Window, opts: HydrateFactoryOptions, results: HydrateResults, resolve: (results: HydrateResults) => void) {
+function afterHydrate(
+  win: Window,
+  opts: HydrateFactoryOptions,
+  results: HydrateResults,
+  resolve: (results: HydrateResults) => void,
+) {
   if (typeof opts.afterHydrate === 'function') {
     try {
       const rtn = opts.afterHydrate(win.document);
@@ -130,7 +145,13 @@ function afterHydrate(win: Window, opts: HydrateFactoryOptions, results: Hydrate
   }
 }
 
-function finalizeHydrate(win: Window, doc: Document, opts: HydrateFactoryOptions, results: HydrateResults, resolve: (results: HydrateResults) => void) {
+function finalizeHydrate(
+  win: Window,
+  doc: Document,
+  opts: HydrateFactoryOptions,
+  results: HydrateResults,
+  resolve: (results: HydrateResults) => void,
+) {
   try {
     inspectElement(results, doc.documentElement, 0);
 
@@ -221,7 +242,14 @@ export function serializeDocumentToString(doc: any, opts: HydrateFactoryOptions)
 }
 
 function isValidDocument(doc: Document) {
-  return doc != null && doc.nodeType === 9 && doc.documentElement != null && doc.documentElement.nodeType === 1 && doc.body != null && doc.body.nodeType === 1;
+  return (
+    doc != null &&
+    doc.nodeType === 9 &&
+    doc.documentElement != null &&
+    doc.documentElement.nodeType === 1 &&
+    doc.body != null &&
+    doc.body.nodeType === 1
+  );
 }
 
 function removeScripts(elm: HTMLElement) {

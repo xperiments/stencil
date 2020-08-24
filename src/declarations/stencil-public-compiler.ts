@@ -405,10 +405,9 @@ export interface StencilDevServerConfig {
   root?: string;
   /**
    * If the dev server should Server-Side Render (SSR) each page, meaning it'll dynamically generate
-   * `index.html` requests, and does not serve the prerendered (SSG) `index.html` files. The `--ssr` flag
-   * will most commonly be used with the `--dev --watch --serve` flags during development. Note that this
-   * is for development purposes only, and the built-in dev server should not be used for production.
-   * Defaults to `false`.
+   * server-side rendered html on each page load. The `--ssr` flag will most commonly be used with
+   * the`--dev --watch --serve` flags during development. Note that this is for development purposes
+   * only, and the built-in dev server should not be used for production. Defaults to `false`.
    */
   ssr?: boolean;
   /**
@@ -428,6 +427,7 @@ export interface DevServerConfig extends StencilDevServerConfig {
   excludeHmr?: string[];
   historyApiFallback?: HistoryApiFallback;
   openBrowser?: boolean;
+  prerenderConfig?: string;
   protocol?: 'http' | 'https';
   srcIndexHtml?: string;
 }
@@ -613,23 +613,28 @@ export interface PrerenderConfig {
 
 export interface HydrateDocumentOptions {
   /**
+   * Build ID that will be added to `<html data-stencil-build="BUILD_ID">`. By default
+   * a random ID will be generated
+   */
+  buildId?: string;
+  /**
    * Sets the `href` attribute on the `<link rel="canonical">`
    * tag within the `<head>`. If the value is not defined it will
    * ensure a canonical link tag is no included in the `<head>`.
    */
   canonicalUrl?: string;
   /**
-   * Constrain `setTimeout()` to 1ms, but still async. Also
-   * only allows `setInterval()` to fire once, also constrained to 1ms.
-   * Defaults to `true`.
-   */
-  constrainTimeouts?: boolean;
-  /**
    * Include the HTML comments and attributes used by the clientside
    * JavaScript to read the structure of the HTML and rebuild each
    * component. Defaults to `true`.
    */
   clientHydrateAnnotations?: boolean;
+  /**
+   * Constrain `setTimeout()` to 1ms, but still async. Also
+   * only allows `setInterval()` to fire once, also constrained to 1ms.
+   * Defaults to `true`.
+   */
+  constrainTimeouts?: boolean;
   /**
    * Sets `document.cookie`
    */
@@ -2080,12 +2085,14 @@ export interface ResolveModuleOptions {
 }
 
 export interface PrerenderStartOptions {
+  buildId?: string;
   hydrateAppFilePath: string;
   componentGraph: BuildResultsComponentGraph;
   srcIndexHtmlPath: string;
 }
 
 export interface PrerenderResults {
+  buildId: string;
   diagnostics: Diagnostic[];
   urls: number;
   duration: number;

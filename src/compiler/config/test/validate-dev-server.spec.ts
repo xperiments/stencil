@@ -252,4 +252,15 @@ describe('validateDevServer', () => {
     const { config } = validateConfig(inputConfig);
     expect(config.devServer.srcIndexHtml).toBe(normalizePath(path.join(root, 'some', 'path', 'src', 'index.html')));
   });
+
+  it('should set srcIndexHtml from config', () => {
+    const wwwOutputTarget: d.OutputTargetWww = {
+      type: 'www',
+      prerenderConfig: normalizePath(path.join(root, 'some', 'path', 'prerender.config.ts')),
+    };
+    inputConfig.outputTargets = [wwwOutputTarget];
+    inputConfig.flags.ssr = true;
+    const { config } = validateConfig(inputConfig);
+    expect(config.devServer.prerenderConfig).toBe(wwwOutputTarget.prerenderConfig);
+  });
 });

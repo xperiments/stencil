@@ -72,8 +72,15 @@ export const validateDevServer = (config: d.Config, diagnostics: d.Diagnostic[])
     devServer.websocket = true;
   }
 
-  if (!isBoolean(devServer.ssr)) {
-    devServer.ssr = !!flags.ssr;
+  if (config?.flags?.ssr) {
+    devServer.ssr = true;
+  } else {
+    devServer.ssr = !!devServer.ssr;
+  }
+
+  if (devServer.ssr) {
+    const wwwOutput = config.outputTargets.find(isOutputTargetWww);
+    devServer.prerenderConfig = wwwOutput?.prerenderConfig;
   }
 
   devServer.srcIndexHtml = config.srcIndexHtml;

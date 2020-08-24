@@ -1,2 +1,2 @@
-import { createStaticRouter } from 'stencil-router-v2';
+import { createStaticRouter } from './stencil-router';
 export const Router = createStaticRouter();

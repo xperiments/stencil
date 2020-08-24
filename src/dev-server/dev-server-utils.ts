@@ -3,15 +3,21 @@ import * as c from './dev-server-constants';
 import contentTypes from './content-types-db.json';
 import { version } from '../version';
 
-export function responseHeaders(headers: d.DevResponseHeaders): any {
-  return { ...DEFAULT_HEADERS, ...headers };
+export function responseHeaders(headers: d.DevResponseHeaders, httpCache = false): any {
+  headers = { ...DEFAULT_HEADERS, ...headers };
+  if (httpCache) {
+    headers['cache-control'] = 'max-age=3600';
+    delete headers['date'];
+    delete headers['expires'];
+  }
+  return headers;
 }
 
 const DEFAULT_HEADERS: d.DevResponseHeaders = {
   'cache-control': 'no-cache, no-store, must-revalidate, max-age=0',
   'expires': '0',
-  'server': 'Stencil Dev Server ' + version,
   'date': 'Wed, 1 Jan 2000 00:00:00 GMT',
+  'server': 'Stencil Dev Server ' + version,
   'access-control-allow-origin': '*',
   'access-control-expose-headers': '*',
 };
@@ -68,6 +74,31 @@ const TXT_EXT = ['css', 'html', 'htm', 'js', 'json', 'svg', 'xml'];
 export function isSimpleText(filePath: string) {
   const ext = filePath.toLowerCase().trim().split('.').pop();
   return TXT_EXT.includes(ext);
+}
+
+export function isExtensionLessPath(pathname: string) {
+  const parts = pathname.split('/');
+  const lastPart = parts[parts.length - 1];
+  return !lastPart.includes('.');
+}
+
+export function isSsrStaticDataPath(pathname: string) {
+  const parts = pathname.split('/');
+  const fileName = parts[parts.length - 1].split('?')[0];
+  return fileName === 'page.state.json';
+}
+
+export function getSsrStaticDataPath(pathname: string) {
+  const parts = pathname.split('/');
+  let fileName = parts[parts.length - 1];
+  const fileNameParts = fileName.split('?');
+
+  parts.pop();
+  return {
+    ssrPath: parts.join('/'),
+    fileName: fileNameParts[0],
+    hasQueryString: typeof fileNameParts[1] === 'string' && fileNameParts[1].length > 0,
+  };
 }
 
 export function isDevClient(pathname: string) {

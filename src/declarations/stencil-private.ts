@@ -988,6 +988,7 @@ export interface CssVarShim {
 export interface DevClientWindow extends Window {
   ['s-dev-server']: boolean;
   ['s-initial-load']: boolean;
+  ['s-build-id']: number;
   WebSocket: new (socketUrl: string, protos: string[]) => WebSocket;
   devServerConfig?: DevClientConfig;
 }
@@ -1039,6 +1040,7 @@ export interface DevServerContext {
   getBuildResults: () => Promise<CompilerBuildResults>;
   getCompilerRequest: (path: string) => Promise<CompilerRequestResponse>;
   logRequest: (req: { method: string; pathname?: string }, status: number) => void;
+  prerenderConfig: PrerenderConfig;
   serve302: (req: any, res: any, pathname?: string) => void;
   serve404: (req: any, res: any, xSource: string, content?: string) => void;
   serve500: (req: any, res: any, error: any, xSource: string) => void;
@@ -1299,6 +1301,7 @@ export interface InMemoryFileSystem {
 }
 
 export interface HydrateResults {
+  buildId: string;
   diagnostics: Diagnostic[];
   url: string;
   host: string;
@@ -1311,9 +1314,10 @@ export interface HydrateResults {
   html: string;
   components: HydrateComponent[];
   anchors: HydrateAnchorElement[];
-  styles: HydrateStyleElement[];
-  scripts: HydrateScriptElement[];
   imgs: HydrateImgElement[];
+  scripts: HydrateScriptElement[];
+  styles: HydrateStyleElement[];
+  staticData: HydrateStaticData[];
   title: string;
   hydratedCount: number;
   httpStatus: number;
@@ -1335,8 +1339,8 @@ export interface HydrateAnchorElement extends HydrateElement {
   target?: string;
 }
 
-export interface HydrateStyleElement extends HydrateElement {
-  href?: string;
+export interface HydrateImgElement extends HydrateElement {
+  src?: string;
 }
 
 export interface HydrateScriptElement extends HydrateElement {
@@ -1344,8 +1348,14 @@ export interface HydrateScriptElement extends HydrateElement {
   type?: string;
 }
 
-export interface HydrateImgElement extends HydrateElement {
-  src?: string;
+export interface HydrateStyleElement extends HydrateElement {
+  href?: string;
+}
+
+export interface HydrateStaticData {
+  id: string;
+  type: string;
+  content: string;
 }
 
 export interface JsDoc {
@@ -1448,14 +1458,13 @@ export interface PluginCtx {
 }
 
 export interface PrerenderUrlResults {
-  id: string;
   anchorUrls: string[];
   diagnostics: Diagnostic[];
   filePath: string;
 }
 
 export interface PrerenderUrlRequest {
-  id: string;
+  buildId: string;
   baseUrl: string;
   componentGraphPath: string;
   devServerHostUrl: string;
@@ -1469,7 +1478,6 @@ export interface PrerenderUrlRequest {
 }
 
 export interface PrerenderManager {
-  id: string;
   config: Config;
   prerenderUrlWorker: (prerenderRequest: PrerenderUrlRequest) => Promise<PrerenderUrlResults>;
   devServerHostUrl: string;

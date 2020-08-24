@@ -113,8 +113,8 @@ const prerenderUrl = async (results: d.PrerenderResults, manager: d.PrerenderMan
     }
 
     const prerenderRequest: d.PrerenderUrlRequest = {
-      id: manager.id,
       baseUrl: manager.outputTarget.baseUrl,
+      buildId: results.buildId,
       componentGraphPath: manager.componentGraphPath,
       devServerHostUrl: manager.devServerHostUrl,
       hydrateAppFilePath: manager.hydrateAppFilePath,
