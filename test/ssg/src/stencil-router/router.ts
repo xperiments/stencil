@@ -10,7 +10,7 @@ import type {
   RouteParams,
   MatchedRoute,
 } from './types';
-import { getDataFetchPath } from './static';
+import { getDataFetchPath, isPromise } from './static';
 
 interface MatchResult {
   params: RouteParams;
@@ -80,6 +80,14 @@ export const createRouter = (opts?: RouterOptions): Router => {
             url: state.url,
           };
           params = result.route.mapParams(matchedRoute);
+        }
+        if (Build.isServer) {
+          if (isPromise<RouteParams>(params)) {
+            return params.then(result.route.jsx).catch(err => {
+              console.error(err);
+              return result.route.jsx({});
+            });
+          }
         }
         return result.route.jsx(params);
       } else {

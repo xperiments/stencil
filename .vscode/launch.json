@@ -214,7 +214,7 @@
         "--serve",
         "--ssr",
         "--debug",
-        // "--no-open",
+        "--no-open",
         "--max-workers=0",
         "--config",
         "${workspaceFolder}/test/ssg/stencil.config.ts"

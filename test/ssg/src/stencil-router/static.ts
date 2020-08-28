@@ -7,13 +7,23 @@ export const createStaticRouter = () =>
     beforePush,
   });
 
+const setStaticData = (data: any) => {
+  const script = getStatic();
+  script.textContent = JSON.stringify({ data });
+  return data;
+};
+
 export const staticState = (mapFn: MapParamData): ((matchedRoute: MatchedRoute) => PageState) => {
   if (Build.isServer) {
-    return async matchedRoute => {
-      const data = await mapFn(matchedRoute);
-      const script = getStatic();
-      script.textContent = JSON.stringify({ data });
-      return data;
+    return matchedRoute => {
+      const data = mapFn(matchedRoute);
+      if (isPromise(data)) {
+        return data.then(setStaticData).catch(err => {
+          console.error(err);
+          return setStaticData({});
+        });
+      }
+      return setStaticData(data);
     };
   } else {
     return () => {
@@ -56,3 +66,6 @@ const getStatic = () => {
   }
   return staticDataElm;
 };
+
+export const isPromise = <T = any>(v: any): v is Promise<T> =>
+  !!v && (typeof v === 'object' || typeof v === 'function') && typeof v.then === 'function';
