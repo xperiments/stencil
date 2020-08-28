@@ -20,26 +20,35 @@ export function renderToString(html: string | any, options?: SerializeDocumentOp
   opts.serializeToHtml = true;
 
   return new Promise<HydrateResults>(resolve => {
+    let win: Window & typeof globalThis;
     const results = generateHydrateResults(opts);
+
     if (hasError(results.diagnostics)) {
       resolve(results);
     } else if (typeof html === 'string') {
       try {
         opts.destroyWindow = true;
         opts.destroyDocument = true;
-
-        const win = (new MockWindow(html) as any) as Window & typeof globalThis;
+        win = new MockWindow(html) as any;
         render(win, opts, results, resolve);
       } catch (e) {
+        if (win && win.close) {
+          win.close();
+        }
+        win = null;
         renderCatchError(results, e);
         resolve(results);
       }
     } else if (isValidDocument(html)) {
       try {
         opts.destroyDocument = false;
-        const win = patchDomImplementation(html, opts);
+        win = patchDomImplementation(html, opts);
         render(win, opts, results, resolve);
       } catch (e) {
+        if (win && win.close) {
+          win.close();
+        }
+        win = null;
         renderCatchError(results, e);
         resolve(results);
       }
@@ -55,26 +64,35 @@ export function hydrateDocument(doc: any | string, options?: HydrateDocumentOpti
   opts.serializeToHtml = false;
 
   return new Promise<HydrateResults>(resolve => {
+    let win: Window & typeof globalThis;
     const results = generateHydrateResults(opts);
+
     if (hasError(results.diagnostics)) {
       resolve(results);
     } else if (typeof doc === 'string') {
       try {
         opts.destroyWindow = true;
         opts.destroyDocument = true;
-
-        const win = (new MockWindow(doc) as any) as Window & typeof globalThis;
+        win = new MockWindow(doc) as any;
         render(win, opts, results, resolve);
       } catch (e) {
+        if (win && win.close) {
+          win.close();
+        }
+        win = null;
         renderCatchError(results, e);
         resolve(results);
       }
     } else if (isValidDocument(doc)) {
       try {
         opts.destroyDocument = false;
-        const win = patchDomImplementation(doc, opts);
+        win = patchDomImplementation(doc, opts);
         render(win, opts, results, resolve);
       } catch (e) {
+        if (win && win.close) {
+          win.close();
+        }
+        win = null;
         renderCatchError(results, e);
         resolve(results);
       }
@@ -219,7 +237,9 @@ function finalizeHydrate(
         (doc as any).defaultView = null;
       }
 
-      win.close();
+      if (win.close) {
+        win.close();
+      }
     } catch (e) {
       renderCatchError(results, e);
     }
