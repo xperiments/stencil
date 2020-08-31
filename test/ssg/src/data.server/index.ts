@@ -1,30 +1,61 @@
 import type { MapParamData } from '../stencil-router';
+import { slugify, ParseMarkdownOptions, ParseMarkdownResults } from '@stencil/markdown';
+import { parse } from '@stencil/markdown/parse';
+import { cache } from '@stencil/markdown/cache';
+import fs from 'fs';
+import { promisify } from 'util';
+import { basename, join } from 'path';
 
-export interface BlogData {
-  id: string;
-  title: string;
-  content: string;
+const readFile = promisify(fs.readFile);
+const readdir = promisify(fs.readdir);
+
+export interface BlogAttributes {
+  title?: string;
 }
 
-const blogs: BlogData[] = [];
+export interface BlogData extends ParseMarkdownResults<BlogAttributes> {
+  filePath?: string;
+  slug?: string;
+}
 
-export const getBlogs: MapParamData = () => {
-  return {
-    blogs: [
-      {
-        id: 'static-site-generation',
-        title: 'What is SSG?',
-        content:
-          '# What is Static Site Generation (SSG)?\n\nOne of the best ways to build fast, interactive web sites and web apps is to utilize Static Site Generation instead of Server Side Rendering (known as SSR) or Client Side Rendering (known as Single Page Apps, or SPAs).\n\n[Read More](https: //stenciljs.com/docs/static-site-generation)',
-      },
-      {
-        id: 'server-side-rendering',
-        title: 'What is SSR?',
-        content:
-          '# What is Server Side Rendering (SSR)?\n\nStatic Site Generation and Server Side Rendering are often confused but are very different approaches to solve the same problem: providing already rendered content to the client before the client has loaded and rendered itself.\n\n[Read More](https: //stenciljs.com/docs/static-site-generation-server-side-rendering-ssr)',
-      },
-    ],
-  };
+export interface BlogItem {
+  slug: string;
+  title: string;
+}
+
+const blogDir = join(__dirname, '..', 'blogs');
+
+const parseOpts: ParseMarkdownOptions = {};
+
+const parseBlog = async (filePath: string) => {
+  const blogMarkdown = await readFile(filePath, 'utf8');
+  const results: BlogData = await parse<BlogAttributes>(blogMarkdown, parseOpts, cache);
+  results.filePath = filePath;
+  results.slug = slugify(basename(filePath));
+  return results;
 };
 
-export const getBlog: MapParamData = async ({ params }) => blogs.find(b => b.id === params.id);
+export const getBlogs = async () => {
+  const blogFileNames = await readdir(join(blogDir));
+
+  const blogs = await Promise.all(
+    blogFileNames.map(async blogFileName => {
+      const blogFilePath = join(blogDir, blogFileName);
+      const blogData = await parseBlog(blogFilePath);
+      // minimal data to keep the static data object for all blogs small
+      const blogItem: BlogItem = {
+        slug: blogData.slug,
+        title: blogData.attributes.title,
+      };
+      return blogItem;
+    }),
+  );
+
+  return blogs;
+};
+
+export const getBlog: MapParamData = async ({ params }) => {
+  const fileName = `${params.id}.md`;
+  const filePath = join(blogDir, fileName);
+  return parseBlog(filePath);
+};

@@ -14,7 +14,6 @@ export class AppRoot {
           path="/"
           mapParams={staticState(getBlogs)}
           render={(blogData: BlogData[]) => {
-            debugger;
             return <div>{JSON.stringify(blogData)}</div>;
           }}
         />
