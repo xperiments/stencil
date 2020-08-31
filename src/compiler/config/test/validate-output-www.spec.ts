@@ -1,5 +1,5 @@
 import type * as d from '@stencil/core/declarations';
-import { isOutputTargetCopy, isOutputTargetWww } from '../../output-targets/output-utils';
+import { isOutputTargetCopy, isOutputTargetHydrate, isOutputTargetWww } from '../../output-targets/output-utils';
 import { validateConfig } from '../validate-config';
 import path from 'path';
 
@@ -332,6 +332,30 @@ describe('validateOutputTargetWww', () => {
       const { config } = validateConfig(userConfig);
       expect(config.outputTargets.some(o => o.type === 'dist-hydrate-script')).toBe(true);
       expect(config.outputTargets.some(o => o.type === 'www')).toBe(true);
+    });
+
+    it('should add externals and defaults', () => {
+      const hydrateOutputTarget: d.OutputTargetHydrate = {
+        type: 'dist-hydrate-script',
+        external: ['lodash', 'left-pad'],
+      };
+      userConfig.outputTargets = [hydrateOutputTarget];
+      const { config } = validateConfig(userConfig);
+      const o = config.outputTargets.find(isOutputTargetHydrate);
+      expect(o.external).toContain('lodash');
+      expect(o.external).toContain('left-pad');
+      expect(o.external).toContain('fs');
+      expect(o.external).toContain('path');
+      expect(o.external).toContain('crypto');
+    });
+
+    it('should add node builtins to external by default', () => {
+      userConfig.flags.prerender = true;
+      const { config } = validateConfig(userConfig);
+      const o = config.outputTargets.find(isOutputTargetHydrate);
+      expect(o.external).toContain('fs');
+      expect(o.external).toContain('path');
+      expect(o.external).toContain('crypto');
     });
   });
 });

@@ -1,11 +1,22 @@
+import type * as d from '../../declarations';
 import { normalizeFsPath } from '@utils';
 import type { Plugin } from 'rollup';
 import ts from 'typescript';
-import { NODE_BUILTINS } from '../sys/modules';
 
-export const serverPlugin = (platform: string): Plugin => {
+export const serverPlugin = (config: d.Config, platform: string): Plugin => {
   const isHydrateBundle = platform === 'hydrate';
-  const serverVarid = `@server-var`;
+  const serverVarid = `@removed-server-code`;
+
+  const externals = config.outputTargets.reduce((externals, o) => {
+    if (o.type === 'dist-hydrate-script') {
+      o.external.forEach(external => {
+        if (!externals.includes(external)) {
+          externals.push(external);
+        }
+      });
+    }
+    return externals;
+  }, [] as string[]);
 
   return {
     name: 'serverPlugin',
@@ -14,7 +25,7 @@ export const serverPlugin = (platform: string): Plugin => {
       if (id === serverVarid) {
         return id;
       }
-      if (isHydrateBundle && NODE_BUILTINS.includes(id)) {
+      if (isHydrateBundle && externals.includes(id)) {
         // don't attempt to bundle node builtins for the hydrate bundle
         return {
           id,
@@ -52,7 +63,9 @@ export const serverPlugin = (platform: string): Plugin => {
 
 const removeServerCode = (fileName: string, code: string) => {
   const output: string[] = [];
-  output.push(`import { removedServerVar } from '@server-var';`);
+
+  // shared variable we'll use to represent code that was removed
+  output.push(`import { removedServerVar } from '@removed-server-code';`);
 
   const tsSourceFile = ts.createSourceFile(fileName, code, ts.ScriptTarget.ES2018);
 

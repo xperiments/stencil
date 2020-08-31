@@ -7,6 +7,7 @@ import {
 } from '../../output-targets/output-utils';
 import { isBoolean, isString } from '@utils';
 import { isAbsolute, join } from 'path';
+import { NODE_BUILTINS } from '../../sys/modules';
 
 export const validateHydrateScript = (config: d.Config, userOutputs: d.OutputTarget[]) => {
   const output: d.OutputTargetHydrate[] = [];
@@ -53,6 +54,11 @@ export const validateHydrateScript = (config: d.Config, userOutputs: d.OutputTar
     if (!isBoolean(outputTarget.empty)) {
       outputTarget.empty = true;
     }
+
+    outputTarget.external = outputTarget.external || [];
+
+    outputTarget.external.push(...NODE_BUILTINS);
+
     output.push(outputTarget);
   });
 

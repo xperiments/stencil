@@ -1781,7 +1781,12 @@ export interface OutputTargetDistSelfContained extends OutputTargetBase {
 export interface OutputTargetHydrate extends OutputTargetBase {
   type: 'dist-hydrate-script';
   dir?: string;
-
+  /**
+   * Module IDs that should not be bundled into the script.
+   * By default, all node builtin's, such as `fs` or `path`
+   * will be considered "external" and not bundled.
+   */
+  external?: string[];
   empty?: boolean;
 }
 
