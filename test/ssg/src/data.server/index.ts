@@ -23,7 +23,7 @@ export interface BlogItem {
   title: string;
 }
 
-const blogDir = join(__dirname, '..', 'blogs');
+const blogDir = join(__dirname, '..', '..', 'blogs');
 
 const parseOpts: ParseMarkdownOptions = {};
 

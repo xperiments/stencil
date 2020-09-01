@@ -1,4 +1,4 @@
-import { Component, h } from '@stencil/core';
+import { Component, h, Fragment } from '@stencil/core';
 import { Route, staticState } from '../../stencil-router';
 import { Router } from '../../router';
 import { getBlogs, BlogData } from '../../data.server';
@@ -13,9 +13,13 @@ export class AppRoot {
         <Route
           path="/"
           mapParams={staticState(getBlogs)}
-          render={(blogData: BlogData[]) => {
-            return <div>{JSON.stringify(blogData)}</div>;
-          }}
+          render={(blogData: BlogData[]) => (
+            <Fragment>
+              <h1>Homepage</h1>
+              <ul></ul>
+              return <div>{JSON.stringify(blogData)}</div>;
+            </Fragment>
+          )}
         />
       </Router.Switch>
     );
