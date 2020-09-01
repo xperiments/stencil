@@ -33,7 +33,7 @@ export interface RenderProps {
   path: RoutePath;
   id?: string;
   mapParams?: (matchedRoute: MatchedRoute) => PageState;
-  render?: (pageState: PageState) => any;
+  render?: (pageState: PageState | null, matchedRoute: MatchedRoute) => any;
 }
 
 export interface MatchedRoute {
@@ -51,7 +51,7 @@ export interface RedirectProps {
 export interface RouteEntry {
   path: RoutePath;
   jsx?: any;
-  mapParams?: any;
+  mapParams?: (matchedRoute: MatchedRoute) => PageState;
   to?: string;
   id?: string;
 }
@@ -66,3 +66,5 @@ export interface RouterOptions {
   serializeURL?: (path: string) => URL;
   beforePush?: (path: string) => void | Promise<void>;
 }
+
+export type StateHistory = Map<string, any>;

@@ -139,5 +139,7 @@
     "pwa",
     "progressive web app"
   ],
-  "dependencies": {}
+  "dependencies": {
+    "@stencil/helmet": "^0.3.2"
+  }
 }

@@ -8,9 +8,10 @@ import type {
   RouteProps,
   RoutePath,
   RouteParams,
-  MatchedRoute,
+  PageState,
 } from './types';
-import { getDataFetchPath, isPromise } from './static';
+import { getDataFetchPath, isPromise } from './static-state';
+import { setStaticData, stateHistory } from './static-script-data';
 
 interface MatchResult {
   params: RouteParams;
@@ -64,40 +65,48 @@ export const createRouter = (opts?: RouterOptions): Router => {
     return undefined;
   };
 
-  const navigationChanged = () => {
+  const navigationChanged = (popStateEvent?: PopStateEvent) => {
+    if (popStateEvent && popStateEvent.state) {
+      setStaticData(popStateEvent.state);
+    }
     state.url = new URL(win.location.href);
     state.activePath = parseURL(state.url);
   };
 
   const Switch: any = (_: any, childrenRoutes: RouteEntry[]) => {
     const result = match(childrenRoutes);
+    const route = result?.route;
     if (result) {
-      if (typeof result.route.jsx === 'function') {
-        let params = result.params;
-        if (result.route.mapParams) {
-          const matchedRoute: MatchedRoute = {
-            params,
-            url: state.url,
-          };
-          params = result.route.mapParams(matchedRoute);
-        }
+      if (typeof route.jsx === 'function') {
+        const pageState = route.mapParams
+          ? route.mapParams({
+              params: result.params,
+              url: state.url,
+            })
+          : undefined;
+
         if (Build.isServer) {
-          if (isPromise<RouteParams>(params)) {
-            return params.then(result.route.jsx).catch(err => {
-              console.error(err);
-              return result.route.jsx({});
-            });
+          if (isPromise<PageState>(pageState)) {
+            return pageState
+              .then(pageState => {
+                return route.jsx(pageState, result.params);
+              })
+              .catch(err => {
+                console.error(err);
+                return route.jsx({}, result.params);
+              });
           }
         }
-        return result.route.jsx(params);
+
+        return route.jsx(pageState, result.params);
       } else {
-        return result.route.jsx;
+        return route.jsx;
       }
     }
   };
 
   const disposeRouter = () => {
-    defaultRouter = undefined;
+    defaultRouter = null;
     win.removeEventListener('popstate', navigationChanged);
     dispose();
   };
@@ -161,6 +170,9 @@ export const Route: FunctionalComponent<RouteProps> = (props, children) => {
 };
 
 export const href = (href: string, router: Router | undefined = defaultRouter) => {
+  const url = new URL(href, document.baseURI);
+  const dataFetchUrl = getDataFetchPath(href);
+
   if (Build.isDev) {
     if (!router) {
       console.error('Router must be defined in href()', href);
@@ -168,7 +180,6 @@ export const href = (href: string, router: Router | undefined = defaultRouter) =
         href,
       };
     }
-    const url = new URL(href, document.baseURI);
     const urlParts = url.pathname.split('/');
     const baseName = urlParts[urlParts.length - 1];
     if (baseName.indexOf('.') > -1) {
@@ -188,18 +199,12 @@ export const href = (href: string, router: Router | undefined = defaultRouter) =
     }
   }
 
-  if (Build.isServer) {
-    const dataFetchUrl = getDataFetchPath(href);
-    if (!document.head.querySelector(`link[href="${dataFetchUrl}"]`)) {
-      const link = document.createElement('link');
-      link.setAttribute('rel', 'prefetch');
-      link.setAttribute('as', 'fetch');
-      link.setAttribute('href', dataFetchUrl);
-      document.head.appendChild(link);
-    }
-    return {
-      href,
-    };
+  if (!stateHistory.has(url.href) && !document.head.querySelector(`link[href="${dataFetchUrl}"]`)) {
+    const link = document.createElement('link');
+    link.setAttribute('rel', 'prefetch');
+    link.setAttribute('href', dataFetchUrl);
+    link.setAttribute('as', 'fetch');
+    document.head.appendChild(link);
   }
 
   return {
