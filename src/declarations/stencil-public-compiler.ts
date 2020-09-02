@@ -1774,15 +1774,6 @@ export interface OutputTargetDistLazyLoader extends OutputTargetBase {
   empty: boolean;
 }
 
-export interface OutputTargetDistSelfContained extends OutputTargetBase {
-  type: 'dist-self-contained';
-
-  dir?: string;
-  buildDir?: string;
-
-  empty?: boolean;
-}
-
 export interface OutputTargetHydrate extends OutputTargetBase {
   type: 'dist-hydrate-script';
   dir?: string;
@@ -1975,7 +1966,6 @@ export type OutputTarget =
   | OutputTargetDistLazy
   | OutputTargetDistGlobalStyles
   | OutputTargetDistLazyLoader
-  | OutputTargetDistSelfContained
   | OutputTargetDocsJson
   | OutputTargetDocsCustom
   | OutputTargetDocsReadme
