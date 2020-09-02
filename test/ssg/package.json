@@ -4,5 +4,8 @@
   "scripts": {
     "build": "node ../../bin/stencil build --prerender",
     "start": "node ../../bin/stencil build --dev --watch --serve --ssr"
+  },
+  "dependencies": {
+    "@stencil/helmet": "^0.3.2"
   }
 }

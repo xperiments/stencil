@@ -2,21 +2,13 @@ import type * as d from '../../declarations';
 import { normalizeFsPath } from '@utils';
 import type { Plugin } from 'rollup';
 import ts from 'typescript';
+import { isOutputTargetHydrate } from '../output-targets/output-utils';
 
 export const serverPlugin = (config: d.Config, platform: string): Plugin => {
   const isHydrateBundle = platform === 'hydrate';
   const serverVarid = `@removed-server-code`;
 
-  const externals = config.outputTargets.reduce((externals, o) => {
-    if (o.type === 'dist-hydrate-script') {
-      o.external.forEach(external => {
-        if (!externals.includes(external)) {
-          externals.push(external);
-        }
-      });
-    }
-    return externals;
-  }, [] as string[]);
+  const externals = isHydrateBundle ? config.outputTargets.filter(isOutputTargetHydrate).flatMap(o => o.external) : [];
 
   return {
     name: 'serverPlugin',

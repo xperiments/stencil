@@ -109,7 +109,7 @@ const beforePush = async (path: string) => {
       if (res.ok) {
         const staticData = await res.json();
         if (staticData.components) {
-          console.log('preload', staticData.components);
+          // await preloadComponents({ tags: staticData.components });
         }
         return setStateCache(pushToUrl, staticData);
       }
