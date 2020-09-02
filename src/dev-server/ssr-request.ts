@@ -86,8 +86,10 @@ export async function ssrStaticDataRequest(
         } else {
           const staticData = ssrResults.staticData.find(s => s.id === 'page.state');
           if (staticData) {
+            const data = JSON.parse(staticData.content);
+            data.components = ssrResults.components.map(c => c.tag).sort();
+            content = JSON.stringify(data);
             status = ssrResults.httpStatus;
-            content = staticData.content;
             contentType = staticData.type;
             httpCache = hasQueryString;
           } else {

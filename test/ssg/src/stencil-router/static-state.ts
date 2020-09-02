@@ -1,6 +1,6 @@
 import { createRouter } from './router';
 import { Build } from '@stencil/core';
-import { getStaticElement, setStaticData, stateHistory } from './static-script-data';
+import { getStaticScript, setStaticScript, setStateCache, getStateCache } from './static-cache';
 import type { MapParamData, MatchedRoute, PageState } from './types';
 
 export const createStaticRouter = () =>
@@ -11,40 +11,44 @@ export const createStaticRouter = () =>
 export const staticState = (mapFn: MapParamData): ((matchedRoute: MatchedRoute) => PageState) => {
   if (Build.isServer) {
     // server side (async)
-    return staticServerState(mapFn);
+    return matchedRoute => staticServerState(matchedRoute, mapFn);
   } else {
-    return () => {
-      // client side (sync)
-      let staticState = stateHistory.get(location.href);
-      if (!staticState) {
-        const staticElm = getStaticElement();
-        if (Build.isDev && !staticElm) {
-          console.error('SSR Dev server must be used during development');
-          staticState = {};
-        } else {
-          staticState = JSON.parse(staticElm.textContent!);
-          stateHistory.set(location.href, staticState);
-          staticElm.remove();
-        }
-      }
-      return staticState.data;
-    };
+    return () => staticClientState();
   }
 };
 
-const staticServerState = (mapFn: MapParamData): ((matchedRoute: MatchedRoute) => PageState) => {
-  return matchedRoute => {
-    const inputData = mapFn(matchedRoute);
-
-    if (isPromise(inputData)) {
-      return inputData.then(setServerStaticData).catch(err => {
-        console.error(err);
-        return setServerStaticData({});
-      });
+export const staticClientState = () => {
+  // client side (sync)
+  try {
+    let staticState = getStateCache(location.href);
+    if (!staticState) {
+      const staticElm = getStaticScript();
+      if (Build.isDev && !staticElm) {
+        console.error('SSR Dev server must be used during development');
+        staticState = {};
+      } else {
+        staticState = JSON.parse(staticElm.textContent!);
+        setStateCache(location.href, staticState);
+        staticElm.remove();
+      }
     }
+    return staticState.state;
+  } catch (e) {
+    console.error(e);
+  }
+};
 
-    return setServerStaticData(inputData);
-  };
+const staticServerState = (matchedRoute: MatchedRoute, mapFn: MapParamData): PageState => {
+  const inputData = mapFn(matchedRoute);
+
+  if (isPromise(inputData)) {
+    return inputData.then(setServerStaticData).catch(err => {
+      console.error(err);
+      return setServerStaticData({});
+    });
+  }
+
+  return setServerStaticData(inputData);
 };
 
 const setServerStaticData = (inputData: any) => {
@@ -88,7 +92,7 @@ const setServerStaticData = (inputData: any) => {
   const proxiedData = getterProxy(staticData, 'root', inputData);
 
   window.addEventListener('DOMContentLoaded', () => {
-    setStaticData(JSON.stringify({ data: staticData.root }));
+    setStaticScript(JSON.stringify({ state: staticData.root }));
   });
 
   return proxiedData;
@@ -96,16 +100,18 @@ const setServerStaticData = (inputData: any) => {
 
 const beforePush = async (path: string) => {
   try {
-    const pushToUrl = new URL(path, document.baseURI).href;
-    const hasStateReady = stateHistory.has(pushToUrl);
-    if (!hasStateReady) {
+    const pushToUrl = new URL(path, document.baseURI);
+    if (!getStateCache(pushToUrl)) {
       const fetchUrl = getDataFetchPath(path);
       const res = await fetch(fetchUrl, {
         cache: 'force-cache',
       });
       if (res.ok) {
-        stateHistory.set(pushToUrl, await res.json());
-        return;
+        const staticData = await res.json();
+        if (staticData.components) {
+          console.log('preload', staticData.components);
+        }
+        return setStateCache(pushToUrl, staticData);
       }
     }
     return;

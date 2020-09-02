@@ -10,8 +10,8 @@ import type {
   RouteParams,
   PageState,
 } from './types';
-import { getDataFetchPath, isPromise } from './static-state';
-import { setStaticData, stateHistory } from './static-script-data';
+import { getDataFetchPath, isPromise, staticClientState } from './static-state';
+import { getStateCache } from './static-cache';
 
 interface MatchResult {
   params: RouteParams;
@@ -65,12 +65,21 @@ export const createRouter = (opts?: RouterOptions): Router => {
     return undefined;
   };
 
-  const navigationChanged = (popStateEvent?: PopStateEvent) => {
-    if (popStateEvent && popStateEvent.state) {
-      setStaticData(popStateEvent.state);
+  const navigationChanged = (ev?: PopStateEvent) => {
+    if (ev && !staticClientState()) {
+      // if there's an event then it's from 'popstate' event
+      // and we didn't have cached state and didn't have
+      // state in the <script> element, probably when full
+      // reloading page 2, and hitting the back button to page 1 that
+      // would be in the user's browserhistory, but nothing in-memory
+      // in this window instance, so let's do a full page reload
+      // cuz we don't have any data we can load synchronously
+      location.reload();
+    } else {
+      // we ensured we have synchronous static state ready to go
+      state.url = new URL(win.location.href);
+      state.activePath = parseURL(state.url);
     }
-    state.url = new URL(win.location.href);
-    state.activePath = parseURL(state.url);
   };
 
   const Switch: any = (_: any, childrenRoutes: RouteEntry[]) => {
@@ -199,7 +208,7 @@ export const href = (href: string, router: Router | undefined = defaultRouter) =
     }
   }
 
-  if (!stateHistory.has(url.href) && !document.head.querySelector(`link[href="${dataFetchUrl}"]`)) {
+  if (!getStateCache(url) && !document.head.querySelector(`link[href="${dataFetchUrl}"]`)) {
     const link = document.createElement('link');
     link.setAttribute('rel', 'prefetch');
     link.setAttribute('href', dataFetchUrl);
