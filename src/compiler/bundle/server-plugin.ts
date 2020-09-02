@@ -1,7 +1,6 @@
 import type * as d from '../../declarations';
 import { normalizeFsPath } from '@utils';
 import type { Plugin } from 'rollup';
-import ts from 'typescript';
 import { isOutputTargetHydrate } from '../output-targets/output-utils';
 
 export const serverPlugin = (config: d.Config, platform: string): Plugin => {
@@ -25,6 +24,7 @@ export const serverPlugin = (config: d.Config, platform: string): Plugin => {
             external: true,
           };
         }
+      } else {
         id = normalizeFsPath(id);
         if (id.includes('.server/') || id.endsWith('.server')) {
           // any path that has .server in it shouldn't actually
