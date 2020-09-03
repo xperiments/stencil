@@ -1,6 +1,6 @@
 import { Build } from '@stencil/core';
 import { createRouter } from './router';
-import { isPromise, normalizePathname, urlFromHref } from './utils/helpers';
+import { isPromise, normalizePathname, urlFromHref, devDebug } from './utils/helpers';
 import type { MapParamData, PageState, RouterOptions, RouteParams, StateHistory } from './types';
 
 const stateHistory: StateHistory = new Map();
@@ -9,8 +9,9 @@ const getStateCacheKey = (url: string | URL) => (typeof url === 'string' ? urlFr
 
 const getStateCache = (url: string | URL) => stateHistory.get(getStateCacheKey(url));
 
-const setStateCache = (url: string | URL, stateData: any): void =>
-  stateHistory.set(getStateCacheKey(url), stateData) as any;
+const hasStateCache = (url: string | URL) => stateHistory.has(getStateCacheKey(url));
+
+const setStateCache = (url: string | URL, stateData: any) => stateHistory.set(getStateCacheKey(url), stateData);
 
 export const staticState = (mapFn: MapParamData): ((params: RouteParams) => PageState) => {
   if (Build.isServer) {
@@ -29,19 +30,17 @@ export const staticClientState = () => {
     if (!staticState) {
       const staticElm = document.querySelector('[data-stencil-static="page.state"]') as HTMLScriptElement | null;
 
-      if (Build.isDev) {
-        if (!staticElm) {
-          console.error('SSR Dev server must be used during development');
-          return false;
-        }
-      }
-
       if (staticElm) {
         staticState = JSON.parse(staticElm.textContent!);
-        setStateCache(location.href, staticState);
         staticElm.remove();
+        devDebug(`staticClientState: ${location.pathname} [parsed page.state]`);
+      } else {
+        devDebug(`staticClientState: ${location.pathname} [page.state not found]`);
+        staticState = undefined;
       }
+      setStateCache(location.href, staticState);
     }
+
     return staticState;
   } catch (e) {
     console.error(e);
@@ -123,48 +122,81 @@ export const createStaticRouter = (opts?: RouterOptions) => {
   const getDataFetchPath = (url: URL) =>
     `${url.pathname.endsWith('/') ? url.pathname : url.pathname + '/'}page.state.json?s=${buildId}`;
 
-  if (!buildId) {
-    console.warn(`Stencil Router: html document has not been prerendered, falling back to non-static router`);
-    return createRouter(opts);
+  const beforePush = async (pushToUrl: URL) => {
+    try {
+      if (hasStateCache(pushToUrl)) {
+        // already have static state ready to go
+        devDebug(`beforePush: ${pushToUrl.pathname} [cached state]`);
+        return;
+      }
+
+      // try fetching for the static state
+      const fetchUrl = getDataFetchPath(pushToUrl);
+      const res = await fetch(fetchUrl, {
+        cache: 'force-cache',
+      });
+
+      if (res.ok) {
+        // awesome, we got a good response for page state data
+        const staticData = await res.json();
+        if (staticData.components) {
+          // page state is all the known components already
+          // let's preload them all before navigating
+          // await preloadComponents({ tags: staticData.components });
+        }
+        // cache the page state, which could be undefined, but that's valuable too
+        setStateCache(pushToUrl, staticData['page.state']);
+        devDebug(`beforePush: ${pushToUrl.pathname} [fetched state]`);
+
+        // stop so we don't trigger the location.href
+        return;
+      } else {
+        devDebug(`beforePush: ${pushToUrl.pathname} [fetched failed ${res.status}]`);
+      }
+    } catch (e) {
+      devDebug(`beforePush: ${pushToUrl.pathname}, ${e}`);
+    }
+
+    // something errored, fallback to a normal page navigation
+    location.href = pushToUrl.pathname;
+  };
+
+  const onHrefRender = (navigatedToUrl, currentUrl) => {
+    // let's add a <link rel="prefetch"> for links found on this page
+    // if the page we're navigating to is different than the current page
+    // and we haven't cached it already
+    // and there isn't already a <link> in the document.head for this url
+    if (
+      normalizePathname(navigatedToUrl) !== normalizePathname(currentUrl) &&
+      !getStateCache(navigatedToUrl) &&
+      !doc.head.querySelector(`link[href="${getDataFetchPath(navigatedToUrl)}"]`)
+    ) {
+      const linkElm = doc.createElement('link');
+      linkElm.setAttribute('rel', 'prefetch');
+      linkElm.setAttribute('href', getDataFetchPath(navigatedToUrl));
+      linkElm.setAttribute('as', 'fetch');
+      doc.head.appendChild(linkElm);
+    }
+  };
+
+  const reloadOnPopState = () => {
+    const hasState = hasStateCache(location.href);
+    devDebug(`reloadOnPopState: ${location.pathname} [hasStateCache: ${hasState}]`);
+    return !hasState;
+  };
+
+  if (Build.isBrowser) {
+    if (!buildId) {
+      console.warn(`Stencil Router: html document has not been prerendered, falling back to non-static router`);
+      return createRouter(opts);
+    }
+    staticClientState();
   }
 
   return createRouter({
-    beforePush: async (pushToUrl: URL) => {
-      try {
-        if (!getStateCache(pushToUrl)) {
-          const fetchUrl = getDataFetchPath(pushToUrl);
-          const res = await fetch(fetchUrl, {
-            cache: 'force-cache',
-          });
-          if (res.ok) {
-            const staticData = await res.json();
-            if (staticData.components) {
-              // await preloadComponents({ tags: staticData.components });
-            }
-            return setStateCache(pushToUrl, staticData['page.state']);
-          }
-        }
-        return;
-      } catch (e) {}
-
-      // something errored, fallback to a normal page navigation
-      location.href = pushToUrl.pathname;
-    },
-    onHrefRender: (navigatedToUrl, currentUrl) => {
-      const dataFetchUrl = getDataFetchPath(navigatedToUrl);
-      if (
-        normalizePathname(navigatedToUrl) !== normalizePathname(currentUrl) &&
-        !getStateCache(navigatedToUrl) &&
-        !doc.head.querySelector(`link[href="${dataFetchUrl}"]`)
-      ) {
-        const link = doc.createElement('link');
-        link.setAttribute('rel', 'prefetch');
-        link.setAttribute('href', dataFetchUrl);
-        link.setAttribute('as', 'fetch');
-        doc.head.appendChild(link);
-      }
-    },
-    reloadOnPopState: () => !staticClientState(),
+    beforePush,
+    onHrefRender,
+    reloadOnPopState,
     ...opts,
   });
 };
