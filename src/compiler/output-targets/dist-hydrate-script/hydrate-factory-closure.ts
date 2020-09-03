@@ -37,6 +37,7 @@ export function hydrateFactory($stencilWindow, $stencilHydrateOpts, $stencilHydr
   var DOMTokenList = $stencilWindow.DOMTokenList;
   var Element = $stencilWindow.Element;
   var Event = $stencilWindow.Event;
+  var FetchError = $stencilWindow.FetchError;
   var Headers = $stencilWindow.Headers;
   var HTMLAnchorElement = $stencilWindow.HTMLAnchorElement;
   var HTMLBaseElement = $stencilWindow.HTMLBaseElement;

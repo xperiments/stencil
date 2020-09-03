@@ -1,4 +1,4 @@
-import type { MapParamData } from '../stencil-router';
+import type { MapParamData } from '../stencil-router-v2';
 import { slugify, ParseMarkdownOptions } from '@stencil/markdown';
 import { parse } from '@stencil/markdown/parse';
 import { cache } from '@stencil/markdown/cache';
@@ -47,8 +47,8 @@ export const getBlogs = async () => {
   return blogs;
 };
 
-export const getBlog: MapParamData = async ({ params }) => {
-  const fileName = `${params.id}.md`;
+export const getBlog: MapParamData = async ({ id }) => {
+  const fileName = `${id}.md`;
   const filePath = join(blogDir, fileName);
   return parseBlog(filePath);
 };

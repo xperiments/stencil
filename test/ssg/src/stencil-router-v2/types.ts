@@ -19,8 +19,10 @@ export interface Router {
   dispose(): void;
   onChange(key: 'url', cb: OnChangeHandler<'url'>): void;
   onChange(key: 'activePath', cb: OnChangeHandler<'activePath'>): void;
-  push(href: string): void;
+  onHrefRender(url: URL): void;
+  push(href: string): Promise<void>;
   preload(opts: { href: string; as: 'fetch' | 'module' }): void;
+  serializeURL(url: URL): string;
 }
 
 export interface RouterProps {
@@ -32,16 +34,11 @@ export type RouteProps = RenderProps | RedirectProps;
 export interface RenderProps {
   path: RoutePath;
   id?: string;
-  mapParams?: (matchedRoute: MatchedRoute) => PageState;
-  render?: (pageState: PageState | null, matchedRoute: MatchedRoute) => any;
+  mapParams?: (params: RouteParams) => PageState;
+  render?: (params: RouteParams, mappedState: PageState | null) => any;
 }
 
-export interface MatchedRoute {
-  params: RouteParams;
-  url: URL;
-}
-
-export type MapParamData = (matchedRoute: MatchedRoute) => PageState | Promise<PageState>;
+export type MapParamData = (params: RouteParams) => PageState | Promise<PageState>;
 
 export interface RedirectProps {
   path: RoutePath;
@@ -51,7 +48,7 @@ export interface RedirectProps {
 export interface RouteEntry {
   path: RoutePath;
   jsx?: any;
-  mapParams?: (matchedRoute: MatchedRoute) => PageState;
+  mapParams?: (params: RouteParams) => PageState;
   to?: string;
   id?: string;
 }
@@ -62,9 +59,10 @@ export interface InternalRouterState {
 }
 
 export interface RouterOptions {
-  parseURL?: (url: URL) => string;
-  serializeURL?: (path: string) => URL;
-  beforePush?: (path: string) => void | Promise<void>;
+  beforePush?: (url: URL) => void | Promise<void>;
+  onHrefRender?: (navigateToUrl: URL, currentUrl: URL) => void;
+  reloadOnPopState?: (ev: PopStateEvent) => boolean;
+  serializeURL?: (url: URL) => string;
 }
 
 export type StateHistory = Map<string, any>;

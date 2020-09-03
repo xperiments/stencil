@@ -1,5 +1,6 @@
-import { FunctionalComponent, Build } from '@stencil/core';
+import { Build, FunctionalComponent } from '@stencil/core';
 import { createStore } from '@stencil/store';
+import { isPromise, normalizePathname, serializeURL as defaultSerializeUrl, urlFromHref } from './utils/helpers';
 import type {
   Router,
   RouterOptions,
@@ -10,8 +11,6 @@ import type {
   RouteParams,
   PageState,
 } from './types';
-import { getDataFetchPath, isPromise, staticClientState } from './static-state';
-import { getStateCache } from './static-cache';
 
 interface MatchResult {
   params: RouteParams;
@@ -19,34 +18,34 @@ interface MatchResult {
 }
 let defaultRouter: Router | undefined;
 
-export const createRouter = (opts?: RouterOptions): Router => {
-  const win = window;
-  const url = new URL(win.location.href);
-  const parseURL = opts?.parseURL ?? DEFAULT_PARSE_URL;
-  const beforePush =
-    opts?.beforePush ??
-    (() => {
-      return;
-    });
+export const createRouter = (opts?: RouterOptions) => {
+  const url = new URL(location.href);
+  const serializeURL = opts?.serializeURL ?? defaultSerializeUrl;
 
   const { state, onChange, dispose } = createStore<InternalRouterState>(
     {
       url,
-      activePath: parseURL(url),
+      activePath: normalizePathname(url),
     },
     (newV, oldV, prop) => {
       if (prop === 'url') {
-        return newV.href !== oldV.href;
+        return (newV as URL).href !== (oldV as URL).href;
       }
       return newV !== oldV;
     },
   );
 
-  const push = (href: string) => {
-    history.pushState(null, null as any, href);
-    const url = new URL(href, document.baseURI);
-    state.url = url;
-    state.activePath = parseURL(url);
+  const pushState = (updateUrl: URL) => {
+    try {
+      const href = serializeURL(updateUrl);
+      if (href != null) {
+        history.pushState(null, null as any, href);
+        state.url = updateUrl;
+        state.activePath = normalizePathname(updateUrl);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const match = (routes: RouteEntry[]): MatchResult | undefined => {
@@ -55,7 +54,7 @@ export const createRouter = (opts?: RouterOptions): Router => {
       const params = matchPath(activePath, route.path);
       if (params) {
         if (route.to != null) {
-          push(route.to);
+          pushState(urlFromHref(route.to));
           return match(routes);
         } else {
           return { params, route };
@@ -66,7 +65,7 @@ export const createRouter = (opts?: RouterOptions): Router => {
   };
 
   const navigationChanged = (ev?: PopStateEvent) => {
-    if (ev && !staticClientState()) {
+    if (ev && opts?.reloadOnPopState(ev)) {
       // if there's an event then it's from 'popstate' event
       // and we didn't have cached state and didn't have
       // state in the <script> element, probably when full
@@ -77,8 +76,8 @@ export const createRouter = (opts?: RouterOptions): Router => {
       location.reload();
     } else {
       // we ensured we have synchronous static state ready to go
-      state.url = new URL(win.location.href);
-      state.activePath = parseURL(state.url);
+      state.url = new URL(location.href);
+      state.activePath = normalizePathname(state.url);
     }
   };
 
@@ -87,50 +86,52 @@ export const createRouter = (opts?: RouterOptions): Router => {
     const route = result?.route;
     if (result) {
       if (typeof route.jsx === 'function') {
-        const pageState = route.mapParams
-          ? route.mapParams({
-              params: result.params,
-              url: state.url,
-            })
-          : undefined;
+        const pageState = route.mapParams ? route.mapParams(result.params) : undefined;
 
         if (Build.isServer) {
           if (isPromise<PageState>(pageState)) {
             return pageState
-              .then(pageState => {
-                return route.jsx(pageState, result.params);
+              .then(resolvedPagedState => {
+                return route.jsx(result.params, resolvedPagedState);
               })
               .catch(err => {
                 console.error(err);
-                return route.jsx({}, result.params);
+                return route.jsx(result.params);
               });
           }
         }
 
-        return route.jsx(pageState, result.params);
+        return route.jsx(result.params, pageState);
       } else {
         return route.jsx;
       }
     }
   };
 
-  const disposeRouter = () => {
-    defaultRouter = null;
-    win.removeEventListener('popstate', navigationChanged);
-    dispose();
-  };
-
-  const router = (defaultRouter = {
+  const router: Router = (defaultRouter = {
     Switch,
     get url() {
-      return state.url;
+      return urlFromHref(state.url.href);
     },
     get activePath() {
       return state.activePath;
     },
-    push: async href => {
-      await beforePush(href);
-      push(href);
+    push: async (href: string) => {
+      const pushToUrl = urlFromHref(href);
+      try {
+        if (opts?.beforePush) {
+          await opts.beforePush(pushToUrl);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      pushState(pushToUrl);
+    },
+    onChange: onChange as any,
+    onHrefRender: navigateToUrl => {
+      if (opts?.onHrefRender) {
+        opts.onHrefRender(navigateToUrl, state.url);
+      }
     },
     preload: opts => {
       if (!document.head.querySelector(`link[href="${opts.href}"]`)) {
@@ -145,17 +146,63 @@ export const createRouter = (opts?: RouterOptions): Router => {
         document.head.appendChild(lnk);
       }
     },
-    onChange: onChange as any,
-    dispose: disposeRouter,
+    dispose: () => {
+      defaultRouter = null;
+      window.removeEventListener('popstate', navigationChanged);
+      dispose();
+    },
+    serializeURL,
   });
 
-  // Initial update
+  // initial update
   navigationChanged();
 
-  // Listen URL changes
-  win.addEventListener('popstate', navigationChanged);
+  // listen URL changes
+  window.addEventListener('popstate', navigationChanged);
 
   return router;
+};
+
+export const href = (href: string, router: Router | undefined = defaultRouter) => {
+  const goToUrl = urlFromHref(href);
+
+  if (Build.isDev) {
+    if (!router || typeof router.push !== 'function') {
+      console.error('Router must be defined in href()', href);
+      return {
+        href,
+      };
+    }
+
+    const baseName = goToUrl.pathname.split('/').pop();
+    if (baseName.indexOf('.') > -1) {
+      console.error(
+        'Router href() should only be used for a page link, without an extension, and not for an asset',
+        href,
+      );
+      return {
+        href,
+      };
+    }
+    if (goToUrl.host !== new URL(document.baseURI).host) {
+      console.error('Router href() should not be used for external urls', href);
+      return {
+        href,
+      };
+    }
+  }
+
+  router.onHrefRender(goToUrl);
+
+  return {
+    href: router.serializeURL(goToUrl),
+    onClick: (ev: MouseEvent) => {
+      if (!ev.metaKey && !ev.ctrlKey && ev.which != 2 && ev.button != 1) {
+        ev.preventDefault();
+        router.push(href);
+      }
+    },
+  };
 };
 
 export const Route: FunctionalComponent<RouteProps> = (props, children) => {
@@ -178,55 +225,6 @@ export const Route: FunctionalComponent<RouteProps> = (props, children) => {
   return entry as any;
 };
 
-export const href = (href: string, router: Router | undefined = defaultRouter) => {
-  const url = new URL(href, document.baseURI);
-  const dataFetchUrl = getDataFetchPath(href);
-
-  if (Build.isDev) {
-    if (!router) {
-      console.error('Router must be defined in href()', href);
-      return {
-        href,
-      };
-    }
-    const urlParts = url.pathname.split('/');
-    const baseName = urlParts[urlParts.length - 1];
-    if (baseName.indexOf('.') > -1) {
-      console.error(
-        'Router href() should only be used for a page link, without an extension, and not for an asset',
-        href,
-      );
-      return {
-        href,
-      };
-    }
-    if (url.host !== new URL(document.baseURI).host) {
-      console.error('Router href() should not be used for external urls', href);
-      return {
-        href,
-      };
-    }
-  }
-
-  if (!getStateCache(url) && !document.head.querySelector(`link[href="${dataFetchUrl}"]`)) {
-    const link = document.createElement('link');
-    link.setAttribute('rel', 'prefetch');
-    link.setAttribute('href', dataFetchUrl);
-    link.setAttribute('as', 'fetch');
-    document.head.appendChild(link);
-  }
-
-  return {
-    href,
-    onClick: (ev: MouseEvent) => {
-      if (!ev.metaKey && !ev.ctrlKey && ev.which != 2 && ev.button != 1) {
-        ev.preventDefault();
-        router.push(href);
-      }
-    },
-  };
-};
-
 const matchPath = (pathname: string, path: RoutePath): RouteParams | undefined => {
   if (typeof path === 'string') {
     if (path === pathname) {
@@ -247,6 +245,4 @@ const matchPath = (pathname: string, path: RoutePath): RouteParams | undefined =
   return undefined;
 };
 
-const DEFAULT_PARSE_URL = (url: URL) => url.pathname.toLowerCase();
-
-export const NotFound = () => ({});
+export const NotFound = () => {};

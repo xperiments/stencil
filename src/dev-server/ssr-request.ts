@@ -2,7 +2,7 @@ import type * as d from '../declarations';
 import type { ServerResponse } from 'http';
 import { responseHeaders, getSsrStaticDataPath } from './dev-server-utils';
 import { appendDevServerClientScript } from './serve-file';
-import { catchError, isString, isFunction } from '@utils';
+import { catchError, isFunction, isString } from '@utils';
 import path from 'path';
 
 export async function ssrPageRequest(
@@ -19,7 +19,7 @@ export async function ssrPageRequest(
 
     if (diagnostics.length === 0) {
       try {
-        const opts = getSsrHydrateOptions(serverCtx, req.url);
+        const opts = getSsrHydrateOptions(devServerConfig, serverCtx, req.url);
 
         const ssrResults = await hydrateApp.renderToString(srcIndexHtml, opts);
 
@@ -65,9 +65,8 @@ export async function ssrStaticDataRequest(
   res: ServerResponse,
 ) {
   try {
+    const data: any = {};
     let status = 500;
-    let content = '';
-    let contentType = 'text/plain; charset=utf-8';
     let httpCache = false;
 
     const { hydrateApp, srcIndexHtml, diagnostics } = await setupHydrateApp(devServerConfig, serverCtx);
@@ -77,25 +76,23 @@ export async function ssrStaticDataRequest(
         const { ssrPath, hasQueryString } = getSsrStaticDataPath(req.url.href);
         const url = new URL(ssrPath, req.url);
 
-        const opts = getSsrHydrateOptions(serverCtx, url);
+        const opts = getSsrHydrateOptions(devServerConfig, serverCtx, url);
 
         const ssrResults = await hydrateApp.renderToString(srcIndexHtml, opts);
 
         if (ssrResults.diagnostics.length > 0) {
           diagnostics.push(...ssrResults.diagnostics);
         } else {
-          const staticData = ssrResults.staticData.find(s => s.id === 'page.state');
-          if (staticData) {
-            const data = JSON.parse(staticData.content);
-            data.components = ssrResults.components.map(c => c.tag).sort();
-            content = JSON.stringify(data);
-            status = ssrResults.httpStatus;
-            contentType = staticData.type;
-            httpCache = hasQueryString;
-          } else {
-            status = 404;
-            content = `404 ${req.url.pathname}`;
-          }
+          ssrResults.staticData.forEach(s => {
+            if (s.type === 'application/json') {
+              data[s.id] = JSON.parse(s.content);
+            } else {
+              data[s.id] = s.content;
+            }
+          });
+          data.components = ssrResults.components.map(c => c.tag).sort();
+          httpCache = hasQueryString;
+          status = 200;
         }
       } catch (e) {
         catchError(diagnostics, e);
@@ -103,16 +100,17 @@ export async function ssrStaticDataRequest(
     }
 
     if (diagnostics.length > 0) {
-      content = getSsrErrorContent(diagnostics);
+      data.diagnostics = diagnostics;
     }
 
+    const content = JSON.stringify(data);
     serverCtx.logRequest(req, status);
 
     res.writeHead(
       status,
       responseHeaders(
         {
-          'content-type': contentType,
+          'content-type': 'application/json; charset=utf-8',
           'content-length': Buffer.byteLength(content, 'utf8'),
         },
         httpCache,
@@ -170,7 +168,7 @@ async function setupHydrateApp(devServerConfig: d.DevServerConfig, serverCtx: d.
   };
 }
 
-function getSsrHydrateOptions(serverCtx: d.DevServerContext, url: URL) {
+function getSsrHydrateOptions(devServerConfig: d.DevServerConfig, serverCtx: d.DevServerContext, url: URL) {
   const opts: d.PrerenderHydrateOptions = {
     url: url.href,
     addModulePreloads: false,
@@ -191,6 +189,24 @@ function getSsrHydrateOptions(serverCtx: d.DevServerContext, url: URL) {
       Object.assign(opts, userOpts);
     }
   }
+
+  if (isFunction(serverCtx.sys.applyPrerenderGlobalPatch)) {
+    const orgBeforeHydrate = opts.beforeHydrate;
+    opts.beforeHydrate = (document: Document) => {
+      // patch this new window with the fetch global from node-fetch
+      const devServerBaseUrl = new URL(devServerConfig.browserUrl);
+      const devServerHostUrl = devServerBaseUrl.origin;
+      serverCtx.sys.applyPrerenderGlobalPatch({
+        devServerHostUrl: devServerHostUrl,
+        window: document.defaultView,
+      });
+
+      if (typeof orgBeforeHydrate === 'function') {
+        return orgBeforeHydrate(document);
+      }
+    };
+  }
+
   return opts;
 }
 

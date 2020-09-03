@@ -1,5 +1,5 @@
 import { Component, h, Fragment } from '@stencil/core';
-import { Route, href, match, staticState } from '../../stencil-router';
+import { Route, href, match, staticState } from '../../stencil-router-v2';
 import { Router } from '../../router';
 import { getBlogs, getBlog, BlogData } from '../../data.server';
 import { Markdown } from '@stencil/markdown';
@@ -15,7 +15,7 @@ export class AppRoot {
         <Route
           path={match('/blog/:id')}
           mapParams={staticState(getBlog)}
-          render={(pageState: BlogData) => {
+          render={(_, pageState: BlogData) => {
             return (
               <Fragment>
                 <Helmet>
@@ -34,7 +34,7 @@ export class AppRoot {
         <Route
           path="/"
           mapParams={staticState(getBlogs)}
-          render={(blogs: BlogData[]) => (
+          render={(_, blogs: BlogData[]) => (
             <Fragment>
               <h1>Homepage</h1>
               <ul>
