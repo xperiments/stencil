@@ -1,6 +1,12 @@
 import { Build, FunctionalComponent } from '@stencil/core';
 import { createStore } from '@stencil/store';
-import { isPromise, normalizePathname, serializeURL as defaultSerializeUrl, urlFromHref } from './utils/helpers';
+import {
+  isPromise,
+  normalizePathname,
+  serializeURL as defaultSerializeUrl,
+  urlFromHref,
+  devDebug,
+} from './utils/helpers';
 import type {
   Router,
   RouterOptions,
@@ -37,9 +43,10 @@ export const createRouter = (opts?: RouterOptions) => {
 
   const pushState = (updateUrl: URL) => {
     try {
-      const href = serializeURL(updateUrl);
-      if (href != null) {
-        history.pushState(null, null as any, href);
+      const path = serializeURL(updateUrl);
+      if (path != null) {
+        devDebug(`pushState: ${path}`);
+        history.pushState(null, null as any, path);
         state.url = updateUrl;
         state.activePath = normalizePathname(updateUrl);
       }
@@ -86,7 +93,7 @@ export const createRouter = (opts?: RouterOptions) => {
     const route = result?.route;
     if (result) {
       if (typeof route.jsx === 'function') {
-        const pageState = route.mapParams ? route.mapParams(result.params) : undefined;
+        const pageState = route.mapParams ? route.mapParams(result.params, state.url) : undefined;
 
         if (Build.isServer) {
           if (isPromise<PageState>(pageState)) {
@@ -159,6 +166,8 @@ export const createRouter = (opts?: RouterOptions) => {
 
   // listen URL changes
   window.addEventListener('popstate', navigationChanged);
+
+  devDebug(`created router`);
 
   return router;
 };

@@ -13,10 +13,10 @@ const hasStateCache = (url: string | URL) => stateHistory.has(getStateCacheKey(u
 
 const setStateCache = (url: string | URL, stateData: any) => stateHistory.set(getStateCacheKey(url), stateData);
 
-export const staticState = (mapFn: MapParamData): ((params: RouteParams) => PageState) => {
+export const staticState = (mapFn: MapParamData): ((params?: RouteParams, url?: URL) => PageState) => {
   if (Build.isServer) {
     // server side (async)
-    return params => staticServerState(params, mapFn);
+    return (params, url) => staticServerState(params, url, mapFn);
   } else {
     // client side (sync)
     return () => staticClientState();
@@ -47,9 +47,9 @@ export const staticClientState = () => {
   }
 };
 
-const staticServerState = (params: RouteParams, mapFn: MapParamData): PageState => {
+const staticServerState = (params: RouteParams, url: URL, mapFn: MapParamData): PageState => {
   // server-side only
-  const inputData = mapFn(params);
+  const inputData = mapFn(params, url);
 
   if (isPromise(inputData)) {
     return inputData.then(setServerStaticData).catch(err => {
@@ -124,6 +124,11 @@ export const createStaticRouter = (opts?: RouterOptions) => {
 
   const beforePush = async (pushToUrl: URL) => {
     try {
+      if (normalizePathname(pushToUrl) === normalizePathname(location)) {
+        devDebug(`beforePush: ${pushToUrl.pathname} [no pathname change]`);
+        return;
+      }
+
       if (hasStateCache(pushToUrl)) {
         // already have static state ready to go
         devDebug(`beforePush: ${pushToUrl.pathname} [cached state]`);

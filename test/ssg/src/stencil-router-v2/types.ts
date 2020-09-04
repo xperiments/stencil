@@ -34,11 +34,11 @@ export type RouteProps = RenderProps | RedirectProps;
 export interface RenderProps {
   path: RoutePath;
   id?: string;
-  mapParams?: (params: RouteParams) => PageState;
+  mapParams?: (params: RouteParams, url: URL) => PageState;
   render?: (params: RouteParams, mappedState: PageState | null) => any;
 }
 
-export type MapParamData = (params: RouteParams) => PageState | Promise<PageState>;
+export type MapParamData = (params: RouteParams, url: URL) => PageState | Promise<PageState>;
 
 export interface RedirectProps {
   path: RoutePath;
@@ -48,7 +48,7 @@ export interface RedirectProps {
 export interface RouteEntry {
   path: RoutePath;
   jsx?: any;
-  mapParams?: (params: RouteParams) => PageState;
+  mapParams?: (params: RouteParams, url: URL) => PageState;
   to?: string;
   id?: string;
 }
