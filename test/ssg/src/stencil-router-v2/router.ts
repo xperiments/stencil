@@ -1,11 +1,13 @@
-import { Build, FunctionalComponent } from '@stencil/core';
+import { Build, FunctionalComponent, FunctionalUtilities, VNode, h, writeTask } from '@stencil/core';
 import { createStore } from '@stencil/store';
 import {
   isPromise,
+  isString,
   normalizePathname,
   serializeURL as defaultSerializeUrl,
   urlFromHref,
   devDebug,
+  isFunction,
 } from './utils/helpers';
 import type {
   Router,
@@ -16,6 +18,7 @@ import type {
   RoutePath,
   RouteParams,
   PageState,
+  SwitchView,
 } from './types';
 
 interface MatchResult {
@@ -24,14 +27,17 @@ interface MatchResult {
 }
 let defaultRouter: Router | undefined;
 
-export const createRouter = (opts?: RouterOptions) => {
-  const url = new URL(location.href);
+export const createWindowRouter = (win: Window, doc: Document, loc: Location, hstry: History, opts: RouterOptions) => {
+  let hasLoadedRouter = false;
+  let hasQueuedView = false;
+  let activePath = normalizePathname(loc);
+
   const serializeURL = opts?.serializeURL ?? defaultSerializeUrl;
 
   const { state, onChange, dispose } = createStore<InternalRouterState>(
     {
-      url,
-      activePath: normalizePathname(url),
+      url: urlFromHref(loc.href),
+      views: [],
     },
     (newV, oldV, prop) => {
       if (prop === 'url') {
@@ -46,9 +52,8 @@ export const createRouter = (opts?: RouterOptions) => {
       const path = serializeURL(updateUrl);
       if (path != null) {
         devDebug(`pushState: ${path}`);
-        history.pushState(null, null as any, path);
         state.url = updateUrl;
-        state.activePath = normalizePathname(updateUrl);
+        activePath = normalizePathname(updateUrl);
       }
     } catch (e) {
       console.error(e);
@@ -56,7 +61,6 @@ export const createRouter = (opts?: RouterOptions) => {
   };
 
   const match = (routes: RouteEntry[]): MatchResult | undefined => {
-    const { activePath } = state;
     for (const route of routes) {
       const params = matchPath(activePath, route.path);
       if (params) {
@@ -71,8 +75,139 @@ export const createRouter = (opts?: RouterOptions) => {
     return undefined;
   };
 
-  const navigationChanged = (ev?: PopStateEvent) => {
-    if (ev && opts?.reloadOnPopState(ev)) {
+  const setUrl = async (href: string) => {
+    const pushToUrl = urlFromHref(href);
+    try {
+      if (opts?.beforePush) {
+        await opts.beforePush(pushToUrl);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    state.url = pushToUrl;
+    activePath = normalizePathname(pushToUrl);
+  };
+
+  const createSwitchChildren = (matchedViewChildren: any) => {
+    pushView(matchedViewChildren);
+
+    hasQueuedView = false;
+
+    if (hasLoadedRouter) {
+      const views = state.views;
+      for (const view of views) {
+        if (view.s === VIEW_STATE.QUEUED) {
+          checkForQueuedView(view);
+        }
+        if (!hasQueuedView) {
+          // the view being added didn't have any children that
+          // requires a transition, just stop here and only show the active
+          break;
+        }
+      }
+      if (hasQueuedView && views.length > 1) {
+        for (const view of views) {
+          view.c = updateQueuedView(view);
+        }
+      } else {
+        views[0].c = matchedViewChildren;
+      }
+    }
+
+    updateSwitchVNodes();
+  };
+
+  const pushView = (matchedViewChildren: any) => {
+    const views = state.views;
+    if (views.length === 0 || (views.length > 0 && views[0].h !== state.url.href)) {
+      state.views = [
+        {
+          s: VIEW_STATE.QUEUED,
+          c: matchedViewChildren,
+          h: state.url.href,
+        },
+        ...views.filter(v => v.s !== VIEW_STATE.QUEUED).map(v => ({ ...v, s: VIEW_STATE.LEAVING })),
+      ];
+    }
+  };
+
+  const checkForQueuedView = (view: SwitchView) => {
+    h((_t: any, _c: VNode[], utils: FunctionalUtilities) => {
+      if (Array.isArray(view.c)) {
+        utils.forEach(view.c, (vnode, i) => {
+          if (vnode && !isString(view.c[i]) && isString(vnode.vtag) && vnode.vtag.includes('-')) {
+            hasQueuedView = true;
+          }
+        });
+      }
+    }, null);
+  };
+
+  const updateQueuedView = (view: SwitchView) =>
+    h((_t: any, _c: VNode[], utils: FunctionalUtilities) => {
+      let hChildren = null;
+
+      if (Array.isArray(view.c)) {
+        hChildren = utils.map(view.c, (vnode, i) => {
+          if (vnode && view.s === VIEW_STATE.QUEUED && !isString(view.c[i])) {
+            vnode.vattrs = vnode.vattrs || {};
+            vnode.vattrs.class = (vnode.vattrs.class || '') + ' stencil-router-queue';
+          }
+          return vnode;
+        });
+
+        for (let i = 0; i < view.c.length; i++) {
+          // text nodes are not mapped correctly with the function utils
+          if (isString(view.c[i])) {
+            hChildren[i] = view.c[i];
+          }
+        }
+      }
+
+      return hChildren;
+    }, null);
+
+  const historyPushState = (views: SwitchView[]) => {
+    const href = views[0].h;
+    if (hasLoadedRouter && loc.href !== href) {
+      hstry.pushState(href, null as any, href);
+    }
+    hasLoadedRouter = true;
+  };
+
+  const updateSwitchVNodes = () => {
+    if (!hasQueuedView) {
+      state.views = [state.views[0]];
+    }
+
+    if (!hasLoadedRouter || state.views.length === 1) {
+      state.views[0].s = VIEW_STATE.ACTIVE;
+    } else {
+      const queuedViews = state.views.filter(v => v.s === VIEW_STATE.QUEUED);
+
+      if (queuedViews.length > 0) {
+        queuedViews.forEach(v => {
+          if (Array.isArray(v.c)) {
+            v.c = v.c.map(c => (isString(c) ? '' : c));
+          }
+        });
+
+        writeTask(() => {
+          const activeView = state.views[0];
+          activeView.s = VIEW_STATE.ACTIVE;
+          state.views = [activeView];
+        });
+
+        return;
+      }
+    }
+
+    historyPushState(state.views);
+  };
+
+  const navigationChanged = (ev: PopStateEvent) => {
+    devDebug(`navigationChanged to: ${loc.pathname}`);
+    if (isFunction(opts.reloadOnPopState) && opts.reloadOnPopState(ev)) {
       // if there's an event then it's from 'popstate' event
       // and we didn't have cached state and didn't have
       // state in the <script> element, probably when full
@@ -80,38 +215,51 @@ export const createRouter = (opts?: RouterOptions) => {
       // would be in the user's browserhistory, but nothing in-memory
       // in this window instance, so let's do a full page reload
       // cuz we don't have any data we can load synchronously
-      location.reload();
+      loc.reload();
     } else {
       // we ensured we have synchronous static state ready to go
-      state.url = new URL(location.href);
-      state.activePath = normalizePathname(state.url);
+      setUrl(loc.href);
     }
   };
 
-  const Switch: any = (_: any, childrenRoutes: RouteEntry[]) => {
-    const result = match(childrenRoutes);
-    const route = result?.route;
-    if (result) {
-      if (typeof route.jsx === 'function') {
-        const pageState = route.mapParams ? route.mapParams(result.params, state.url) : undefined;
+  const getRouteChildren = (matchResult: MatchResult): any => {
+    const route = matchResult?.route;
+    if (route) {
+      if (isFunction(route.jsx)) {
+        const pageState = route.mapParams ? route.mapParams(matchResult.params, state.url) : undefined;
 
         if (Build.isServer) {
           if (isPromise<PageState>(pageState)) {
             return pageState
-              .then(resolvedPagedState => {
-                return route.jsx(result.params, resolvedPagedState);
-              })
+              .then(resolvedPagedState => route.jsx(matchResult.params, resolvedPagedState))
               .catch(err => {
                 console.error(err);
-                return route.jsx(result.params);
+                return route.jsx(matchResult.params);
               });
           }
         }
 
-        return route.jsx(result.params, pageState);
+        return route.jsx(matchResult.params, pageState);
       } else {
         return route.jsx;
       }
+    }
+  };
+
+  const Switch: any = (_: any, childrenRoutes: RouteEntry[]): any => {
+    devDebug(`switch render: ${state.url.pathname}`);
+    const matchResult = match(childrenRoutes);
+    const matchedViewChildren = getRouteChildren(matchResult);
+
+    if (matchedViewChildren) {
+      if (Build.isServer) {
+        // server-side only, no transitions
+        return matchedViewChildren;
+      }
+
+      createSwitchChildren(matchedViewChildren);
+
+      return state.views.map(v => v.c);
     }
   };
 
@@ -121,28 +269,18 @@ export const createRouter = (opts?: RouterOptions) => {
       return urlFromHref(state.url.href);
     },
     get activePath() {
-      return state.activePath;
+      return activePath;
     },
-    push: async (href: string) => {
-      const pushToUrl = urlFromHref(href);
-      try {
-        if (opts?.beforePush) {
-          await opts.beforePush(pushToUrl);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-      pushState(pushToUrl);
-    },
+    push: setUrl,
     onChange: onChange as any,
     onHrefRender: navigateToUrl => {
-      if (opts?.onHrefRender) {
+      if (isFunction(opts.onHrefRender)) {
         opts.onHrefRender(navigateToUrl, state.url);
       }
     },
     preload: opts => {
-      if (!document.head.querySelector(`link[href="${opts.href}"]`)) {
-        const lnk = document.createElement('link');
+      if (!doc.head.querySelector(`link[href="${opts.href}"]`)) {
+        const lnk = doc.createElement('link');
         lnk.href = opts.href;
         if (opts.as === 'module') {
           lnk.rel = 'modulepreload';
@@ -150,22 +288,19 @@ export const createRouter = (opts?: RouterOptions) => {
           lnk.rel = 'prefetch';
           lnk.as = opts.as;
         }
-        document.head.appendChild(lnk);
+        doc.head.appendChild(lnk);
       }
     },
     dispose: () => {
       defaultRouter = null;
-      window.removeEventListener('popstate', navigationChanged);
+      win.removeEventListener('popstate', navigationChanged);
       dispose();
     },
     serializeURL,
   });
 
-  // initial update
-  navigationChanged();
-
   // listen URL changes
-  window.addEventListener('popstate', navigationChanged);
+  win.addEventListener('popstate', navigationChanged);
 
   devDebug(`created router`);
 
@@ -176,7 +311,7 @@ export const href = (href: string, router: Router | undefined = defaultRouter) =
   const goToUrl = urlFromHref(href);
 
   if (Build.isDev) {
-    if (!router || typeof router.push !== 'function') {
+    if (!router || !isFunction(router.push)) {
       console.error('Router must be defined in href()', href);
       return {
         href,
@@ -235,11 +370,11 @@ export const Route: FunctionalComponent<RouteProps> = (props, children) => {
 };
 
 const matchPath = (pathname: string, path: RoutePath): RouteParams | undefined => {
-  if (typeof path === 'string') {
+  if (isString(path)) {
     if (path === pathname) {
       return {};
     }
-  } else if (typeof path === 'function') {
+  } else if (isFunction(path)) {
     const params = path(pathname);
     if (params) {
       return params === true ? {} : { ...params };
@@ -254,4 +389,12 @@ const matchPath = (pathname: string, path: RoutePath): RouteParams | undefined =
   return undefined;
 };
 
+export const createRouter = (opts: RouterOptions = {}) => createWindowRouter(window, document, location, history, opts);
+
 export const NotFound = () => {};
+
+const enum VIEW_STATE {
+  QUEUED,
+  ACTIVE,
+  LEAVING,
+}

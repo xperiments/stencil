@@ -2,7 +2,7 @@ import type * as d from '../declarations';
 import type { ServerResponse } from 'http';
 import { responseHeaders, getSsrStaticDataPath } from './dev-server-utils';
 import { appendDevServerClientScript } from './serve-file';
-import { catchError, hasError, isFunction, isString } from '@utils';
+import { catchError, isFunction, isString } from '@utils';
 import path from 'path';
 
 export async function ssrPageRequest(
@@ -17,7 +17,7 @@ export async function ssrPageRequest(
 
     const { hydrateApp, srcIndexHtml, diagnostics } = await setupHydrateApp(devServerConfig, serverCtx);
 
-    if (!hasError(diagnostics)) {
+    if (!diagnostics.some(diagnostic => diagnostic.level === 'error')) {
       try {
         const opts = getSsrHydrateOptions(devServerConfig, serverCtx, req.url);
 
@@ -31,8 +31,9 @@ export async function ssrPageRequest(
       }
     }
 
-    if (hasError(diagnostics)) {
+    if (diagnostics.some(diagnostic => diagnostic.level === 'error')) {
       content = getSsrErrorContent(diagnostics);
+      status = 500;
     }
 
     if (devServerConfig.websocket) {
@@ -67,7 +68,7 @@ export async function ssrStaticDataRequest(
 
     const { hydrateApp, srcIndexHtml, diagnostics } = await setupHydrateApp(devServerConfig, serverCtx);
 
-    if (!hasError(diagnostics)) {
+    if (!diagnostics.some(diagnostic => diagnostic.level === 'error')) {
       try {
         const { ssrPath, hasQueryString } = getSsrStaticDataPath(req.url.href);
         const url = new URL(ssrPath, req.url);
@@ -96,7 +97,7 @@ export async function ssrStaticDataRequest(
       data.diagnostics = diagnostics;
     }
 
-    const status = hasError(diagnostics) ? 500 : 200;
+    const status = diagnostics.some(diagnostic => diagnostic.level === 'error') ? 500 : 200;
     const content = JSON.stringify(data);
     serverCtx.logRequest(req, status);
 

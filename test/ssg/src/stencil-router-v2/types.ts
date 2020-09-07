@@ -18,7 +18,7 @@ export interface Router {
   readonly activePath: string;
   dispose(): void;
   onChange(key: 'url', cb: OnChangeHandler<'url'>): void;
-  onChange(key: 'activePath', cb: OnChangeHandler<'activePath'>): void;
+  // onChange(key: 'activePath', cb: OnChangeHandler<'activePath'>): void;
   onHrefRender(url: URL): void;
   push(href: string): Promise<void>;
   preload(opts: { href: string; as: 'fetch' | 'module' }): void;
@@ -55,7 +55,7 @@ export interface RouteEntry {
 
 export interface InternalRouterState {
   url: URL;
-  activePath: string;
+  views: SwitchView[];
 }
 
 export interface RouterOptions {
@@ -66,3 +66,18 @@ export interface RouterOptions {
 }
 
 export type StateHistory = Map<string, any>;
+
+export interface SwitchView {
+  /**
+   * state
+   */
+  s: number;
+  /**
+   * children
+   */
+  c: any;
+  /**
+   * href
+   */
+  h: string;
+}

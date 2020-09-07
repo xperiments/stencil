@@ -8,6 +8,8 @@ import { HTMLStencilElement, JSXBase } from "@stencil/core/internal";
 export namespace Components {
     interface AppRoot {
     }
+    interface AsyncCmp {
+    }
     interface BlogPost {
         "data": any;
     }
@@ -19,6 +21,12 @@ declare global {
         prototype: HTMLAppRootElement;
         new (): HTMLAppRootElement;
     };
+    interface HTMLAsyncCmpElement extends Components.AsyncCmp, HTMLStencilElement {
+    }
+    var HTMLAsyncCmpElement: {
+        prototype: HTMLAsyncCmpElement;
+        new (): HTMLAsyncCmpElement;
+    };
     interface HTMLBlogPostElement extends Components.BlogPost, HTMLStencilElement {
     }
     var HTMLBlogPostElement: {
@@ -27,17 +35,21 @@ declare global {
     };
     interface HTMLElementTagNameMap {
         "app-root": HTMLAppRootElement;
+        "async-cmp": HTMLAsyncCmpElement;
         "blog-post": HTMLBlogPostElement;
     }
 }
 declare namespace LocalJSX {
     interface AppRoot {
     }
+    interface AsyncCmp {
+    }
     interface BlogPost {
         "data"?: any;
     }
     interface IntrinsicElements {
         "app-root": AppRoot;
+        "async-cmp": AsyncCmp;
         "blog-post": BlogPost;
     }
 }
@@ -46,6 +58,7 @@ declare module "@stencil/core" {
     export namespace JSX {
         interface IntrinsicElements {
             "app-root": LocalJSX.AppRoot & JSXBase.HTMLAttributes<HTMLAppRootElement>;
+            "async-cmp": LocalJSX.AsyncCmp & JSXBase.HTMLAttributes<HTMLAsyncCmpElement>;
             "blog-post": LocalJSX.BlogPost & JSXBase.HTMLAttributes<HTMLBlogPostElement>;
         }
     }

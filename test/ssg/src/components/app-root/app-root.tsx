@@ -31,6 +31,16 @@ export class AppRoot {
           }}
         />
 
+        <Route path="/text-and-async-component">
+          Text and <async-cmp>async-cmp</async-cmp>
+        </Route>
+
+        <Route path="/text-and-element">
+          Text and <code>Element</code>
+        </Route>
+
+        <Route path="/text">Text Only</Route>
+
         <Route
           path="/"
           mapParams={staticState(getBlogs)}
@@ -43,6 +53,15 @@ export class AppRoot {
                     <a {...href(`/blog/${blog.id}`)}>{blog.title}</a>
                   </li>
                 ))}
+                <li>
+                  <a {...href(`/text-and-async-component`)}>Text And Async Component</a>
+                </li>
+                <li>
+                  <a {...href(`/text-and-element`)}>Text And Element</a>
+                </li>
+                <li>
+                  <a {...href(`/text`)}>Text Only</a>
+                </li>
               </ul>
             </Fragment>
           )}

@@ -1,7 +1,11 @@
 import { Build } from '@stencil/core';
 
+export const isFunction = (v: any): v is Function => typeof v === 'function';
+
 export const isPromise = <T = any>(v: any): v is Promise<T> =>
-  !!v && (typeof v === 'object' || typeof v === 'function') && typeof v.then === 'function';
+  !!v && (typeof v === 'object' || isFunction(v)) && isFunction(v.then);
+
+export const isString = (v: any): v is string => typeof v === 'string';
 
 export const normalizePathname = (url: URL | Location) => url.pathname.toLowerCase();
 
