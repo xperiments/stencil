@@ -7,18 +7,14 @@ export type RoutePath = string | RegExp | ((path: string) => RouteParams | boole
 
 export type RouterState = Readonly<InternalRouterState>;
 
-export type OnChangeHandler<T extends keyof InternalRouterState> = (
-  newValue: InternalRouterState[T],
-  oldValue: InternalRouterState[T],
-) => void;
+export type OnChangeHandler = (newUrl: URL, oldURL: URL) => void;
 
 export interface Router {
   readonly Switch: FunctionalComponent<{}>;
   readonly url: URL;
   readonly activePath: string;
   dispose(): void;
-  onChange(key: 'url', cb: OnChangeHandler<'url'>): void;
-  // onChange(key: 'activePath', cb: OnChangeHandler<'activePath'>): void;
+  onChange(cb: OnChangeHandler): void;
   onHrefRender(url: URL): void;
   push(href: string): Promise<void>;
   preload(opts: { href: string; as: 'fetch' | 'module' }): void;
@@ -80,4 +76,8 @@ export interface SwitchView {
    * href
    */
   h: string;
+  /**
+   * promises
+   */
+  p: Promise<any>[];
 }

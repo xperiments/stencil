@@ -19,6 +19,7 @@ import type {
   RouteParams,
   PageState,
   SwitchView,
+  OnChangeHandler,
 } from './types';
 
 interface MatchResult {
@@ -30,13 +31,14 @@ let defaultRouter: Router | undefined;
 export const createWindowRouter = (win: Window, doc: Document, loc: Location, hstry: History, opts: RouterOptions) => {
   let hasLoadedRouter = false;
   let hasQueuedView = false;
-  let activePath = normalizePathname(loc);
+  let activeUrl = urlFromHref(loc.href);
 
   const serializeURL = opts?.serializeURL ?? defaultSerializeUrl;
+  const onChangeCallacks: OnChangeHandler[] = [];
 
-  const { state, onChange, dispose } = createStore<InternalRouterState>(
+  const { state, dispose } = createStore<InternalRouterState>(
     {
-      url: urlFromHref(loc.href),
+      url: activeUrl,
       views: [],
     },
     (newV, oldV, prop) => {
@@ -53,7 +55,7 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
       if (path != null) {
         devDebug(`pushState: ${path}`);
         state.url = updateUrl;
-        activePath = normalizePathname(updateUrl);
+        activeUrl = updateUrl;
       }
     } catch (e) {
       console.error(e);
@@ -62,7 +64,7 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
 
   const match = (routes: RouteEntry[]): MatchResult | undefined => {
     for (const route of routes) {
-      const params = matchPath(activePath, route.path);
+      const params = matchPath(normalizePathname(state.url), route.path);
       if (params) {
         if (route.to != null) {
           pushState(urlFromHref(route.to));
@@ -85,7 +87,6 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
       console.error(e);
     }
     state.url = pushToUrl;
-    activePath = normalizePathname(pushToUrl);
   };
 
   const createSwitchChildren = (matchedViewChildren: any) => {
@@ -125,6 +126,7 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
           s: VIEW_STATE.QUEUED,
           c: matchedViewChildren,
           h: state.url.href,
+          p: [],
         },
         ...views.filter(v => v.s !== VIEW_STATE.QUEUED).map(v => ({ ...v, s: VIEW_STATE.LEAVING })),
       ];
@@ -133,44 +135,68 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
 
   const checkForQueuedView = (view: SwitchView) => {
     h((_t: any, _c: VNode[], utils: FunctionalUtilities) => {
-      if (Array.isArray(view.c)) {
-        utils.forEach(view.c, (vnode, i) => {
-          if (vnode && !isString(view.c[i]) && isString(vnode.vtag) && vnode.vtag.includes('-')) {
-            hasQueuedView = true;
-          }
-        });
-      }
+      const vchildren = Array.isArray(view.c) ? view.c : [view.c];
+      utils.forEach(vchildren, (vnode, i) => {
+        if (vnode && !isString(view.c[i]) && isString(vnode.vtag) && vnode.vtag.includes('-')) {
+          hasQueuedView = true;
+        }
+      });
     }, null);
   };
 
   const updateQueuedView = (view: SwitchView) =>
     h((_t: any, _c: VNode[], utils: FunctionalUtilities) => {
-      let hChildren = null;
+      const vchildren = Array.isArray(view.c) ? view.c : [view.c];
+      const hChildren = utils.map(vchildren, (vnode, i) => {
+        if (vnode && view.s === VIEW_STATE.QUEUED && !isString(view.c[i])) {
+          vnode.vattrs = vnode.vattrs || {};
+          vnode.vattrs.class = (vnode.vattrs.class || '') + ' stencil-router-queue';
+          const userRef = vnode.vattrs.ref;
+          vnode.vattrs.ref = (el: any) => {
+            addComponentOnReady(view, el);
+            if (userRef) {
+              userRef(el);
+            }
+          };
+        }
+        return vnode;
+      });
 
-      if (Array.isArray(view.c)) {
-        hChildren = utils.map(view.c, (vnode, i) => {
-          if (vnode && view.s === VIEW_STATE.QUEUED && !isString(view.c[i])) {
-            vnode.vattrs = vnode.vattrs || {};
-            vnode.vattrs.class = (vnode.vattrs.class || '') + ' stencil-router-queue';
-          }
-          return vnode;
-        });
-
-        for (let i = 0; i < view.c.length; i++) {
-          // text nodes are not mapped correctly with the function utils
-          if (isString(view.c[i])) {
-            hChildren[i] = view.c[i];
-          }
+      for (let i = 0; i < view.c.length; i++) {
+        // text nodes are not mapped correctly with the function utils
+        if (isString(view.c[i])) {
+          hChildren[i] = view.c[i];
         }
       }
-
       return hChildren;
     }, null);
 
+  const addComponentOnReady = (view: SwitchView, el: any) => {
+    if (el) {
+      console.log('addComponentOnReady', el.nodeName);
+      if (el.componentOnReady) {
+        console.log('addComponentOnReady componentOnReady', el.nodeName);
+        view.p.push(el.componentOnReady());
+      }
+      const children = el.children;
+      for (let i = 0; i < children.length; i++) {
+        addComponentOnReady(view, children[i]);
+      }
+    }
+  };
+
   const historyPushState = (views: SwitchView[]) => {
-    const href = views[0].h;
-    if (hasLoadedRouter && loc.href !== href) {
-      hstry.pushState(href, null as any, href);
+    const newHref = views[0].h;
+    const oldHref = loc.href;
+    if (hasLoadedRouter && oldHref !== newHref) {
+      hstry.pushState(newHref, null as any, newHref);
+      onChangeCallacks.forEach(cb => {
+        try {
+          cb(urlFromHref(newHref), urlFromHref(oldHref));
+        } catch (e) {
+          console.error(e);
+        }
+      });
     }
     hasLoadedRouter = true;
   };
@@ -192,8 +218,9 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
           }
         });
 
-        writeTask(() => {
+        writeTask(async () => {
           const activeView = state.views[0];
+          await Promise.all(activeView.p);
           activeView.s = VIEW_STATE.ACTIVE;
           state.views = [activeView];
         });
@@ -266,13 +293,13 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
   const router: Router = (defaultRouter = {
     Switch,
     get url() {
-      return urlFromHref(state.url.href);
+      return urlFromHref(activeUrl.href);
     },
     get activePath() {
-      return activePath;
+      return activeUrl.pathname;
     },
     push: setUrl,
-    onChange: onChange as any,
+    onChange: cb => onChangeCallacks.push(cb),
     onHrefRender: navigateToUrl => {
       if (isFunction(opts.onHrefRender)) {
         opts.onHrefRender(navigateToUrl, state.url);
