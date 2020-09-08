@@ -173,9 +173,7 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
 
   const addComponentOnReady = (view: SwitchView, el: any) => {
     if (el) {
-      console.log('addComponentOnReady', el.nodeName);
       if (el.componentOnReady) {
-        console.log('addComponentOnReady componentOnReady', el.nodeName);
         view.p.push(el.componentOnReady());
       }
       const children = el.children;

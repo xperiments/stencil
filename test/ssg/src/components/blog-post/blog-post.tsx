@@ -8,16 +8,14 @@ export class BlogPost {
   @Prop() data: any;
 
   async componentWillLoad() {
-    console.log('blog-post componentWillLoad start');
     return new Promise(resolve => {
       setTimeout(() => {
-        console.log('blog-post componentWillLoad end');
-        resolve();
+        resolve()
       }, 1000);
-    });
+    })
   }
 
   render() {
-    return <Host>blog post</Host>;
+    return <Host>{this.data.content}</Host>;
   }
 }

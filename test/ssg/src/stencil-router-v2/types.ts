@@ -5,8 +5,6 @@ export type PageState = { [prop: string]: any };
 
 export type RoutePath = string | RegExp | ((path: string) => RouteParams | boolean | undefined | null);
 
-export type RouterState = Readonly<InternalRouterState>;
-
 export type OnChangeHandler = (newUrl: URL, oldURL: URL) => void;
 
 export interface Router {

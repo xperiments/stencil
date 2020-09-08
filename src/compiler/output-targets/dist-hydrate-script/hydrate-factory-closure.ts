@@ -17,6 +17,7 @@ export function hydrateFactory($stencilWindow, $stencilHydrateOpts, $stencilHydr
   var close = () => {};
   var confirm = $stencilWindow.confirm.bind($stencilWindow);
   var dispatchEvent = $stencilWindow.dispatchEvent.bind($stencilWindow);
+  var fetch = $stencilWindow.fetch.bind($stencilWindow);
   var focus = $stencilWindow.focus.bind($stencilWindow);
   var getComputedStyle = $stencilWindow.getComputedStyle.bind($stencilWindow);
   var matchMedia = $stencilWindow.matchMedia.bind($stencilWindow);
