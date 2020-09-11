@@ -29,7 +29,7 @@ export interface RenderProps {
   path: RoutePath;
   id?: string;
   mapParams?: (params: RouteParams, url: URL) => PageState;
-  render?: (params: RouteParams, mappedState: PageState | null) => any;
+  render?: (params: RouteParams, mappedState: any | null) => any;
 }
 
 export type MapParamData = (params: RouteParams, url: URL) => PageState | Promise<PageState>;

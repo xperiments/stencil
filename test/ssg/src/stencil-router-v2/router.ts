@@ -25,20 +25,19 @@ import type {
 interface MatchResult {
   params: RouteParams;
   route: RouteEntry;
+  index: number;
 }
 let defaultRouter: Router | undefined;
 
 export const createWindowRouter = (win: Window, doc: Document, loc: Location, hstry: History, opts: RouterOptions) => {
-  let hasLoadedRouter = false;
   let hasQueuedView = false;
-  let activeUrl = urlFromHref(loc.href);
 
   const serializeURL = opts?.serializeURL ?? defaultSerializeUrl;
   const onChangeCallacks: OnChangeHandler[] = [];
 
   const { state, dispose } = createStore<InternalRouterState>(
     {
-      url: activeUrl,
+      url: urlFromHref(loc.href),
       views: [],
     },
     (newV, oldV, prop) => {
@@ -55,22 +54,22 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
       if (path != null) {
         devDebug(`pushState: ${path}`);
         state.url = updateUrl;
-        activeUrl = updateUrl;
       }
     } catch (e) {
       console.error(e);
     }
   };
 
-  const match = (routes: RouteEntry[]): MatchResult | undefined => {
-    for (const route of routes) {
-      const params = matchPath(normalizePathname(state.url), route.path);
+  const match = (testUrl: URL, routes: RouteEntry[]): MatchResult | undefined => {
+    for (let i = 0; i < routes.length; i++) {
+      const route = routes[i];
+      const params = matchPath(normalizePathname(testUrl), route.path);
       if (params) {
         if (route.to != null) {
           pushState(urlFromHref(route.to));
-          return match(routes);
+          return match(urlFromHref(route.to), routes);
         } else {
-          return { params, route };
+          return { params, route, index: i };
         }
       }
     }
@@ -89,13 +88,12 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
     state.url = pushToUrl;
   };
 
-  const createSwitchChildren = (matchedViewChildren: any) => {
+  const createSwitchChildren = (matchedViewChildren: any, hasRouteEntryChanged: boolean) => {
     pushView(matchedViewChildren);
-
     hasQueuedView = false;
 
-    if (hasLoadedRouter) {
-      const views = state.views;
+    const views = state.views;
+    if (hasRouteEntryChanged && views.length > 1) {
       for (const view of views) {
         if (view.s === VIEW_STATE.QUEUED) {
           checkForQueuedView(view);
@@ -106,13 +104,14 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
           break;
         }
       }
-      if (hasQueuedView && views.length > 1) {
-        for (const view of views) {
-          view.c = updateQueuedView(view);
-        }
-      } else {
-        views[0].c = matchedViewChildren;
+    }
+
+    if (hasQueuedView && views.length > 1) {
+      for (const view of views) {
+        view.c = updateQueuedView(view);
       }
+    } else {
+      views[0].c = matchedViewChildren;
     }
 
     updateSwitchVNodes();
@@ -148,7 +147,11 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
     h((_t: any, _c: VNode[], utils: FunctionalUtilities) => {
       const vchildren = Array.isArray(view.c) ? view.c : [view.c];
       const hChildren = utils.map(vchildren, (vnode, i) => {
-        if (vnode && view.s === VIEW_STATE.QUEUED && !isString(view.c[i])) {
+        if (isString(vchildren[i])) {
+          // text nodes are not mapped correctly with the function utils
+          return vchildren[i];
+        }
+        if (vnode && hasQueuedView && view.s === VIEW_STATE.QUEUED) {
           vnode.vattrs = vnode.vattrs || {};
           vnode.vattrs.class = (vnode.vattrs.class || '') + ' stencil-router-queue';
           const userRef = vnode.vattrs.ref;
@@ -161,13 +164,6 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
         }
         return vnode;
       });
-
-      for (let i = 0; i < view.c.length; i++) {
-        // text nodes are not mapped correctly with the function utils
-        if (isString(view.c[i])) {
-          hChildren[i] = view.c[i];
-        }
-      }
       return hChildren;
     }, null);
 
@@ -183,28 +179,12 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
     }
   };
 
-  const historyPushState = (views: SwitchView[]) => {
-    const newHref = views[0].h;
-    const oldHref = loc.href;
-    if (hasLoadedRouter && oldHref !== newHref) {
-      hstry.pushState(newHref, null as any, newHref);
-      onChangeCallacks.forEach(cb => {
-        try {
-          cb(urlFromHref(newHref), urlFromHref(oldHref));
-        } catch (e) {
-          console.error(e);
-        }
-      });
-    }
-    hasLoadedRouter = true;
-  };
-
   const updateSwitchVNodes = () => {
     if (!hasQueuedView) {
       state.views = [state.views[0]];
     }
 
-    if (!hasLoadedRouter || state.views.length === 1) {
+    if (state.views.length === 1) {
       state.views[0].s = VIEW_STATE.ACTIVE;
     } else {
       const queuedViews = state.views.filter(v => v.s === VIEW_STATE.QUEUED);
@@ -227,7 +207,21 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
       }
     }
 
-    historyPushState(state.views);
+    const newHref = state.views[0].h;
+    const oldHref = loc.href;
+
+    if (oldHref !== newHref) {
+      hstry.replaceState({ scrollX: win.scrollX, scrollY: win.scrollY }, null);
+      hstry.pushState({ scrollX: 0, scrollY: 0 }, null, newHref);
+
+      onChangeCallacks.forEach(cb => {
+        try {
+          cb(urlFromHref(newHref), urlFromHref(oldHref));
+        } catch (e) {
+          console.error(e);
+        }
+      });
+    }
   };
 
   const navigationChanged = (ev: PopStateEvent) => {
@@ -246,6 +240,10 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
       setUrl(loc.href);
     }
   };
+
+  // const windowScroll = (ev: Scro) => {
+
+  // };
 
   const getRouteChildren = (matchResult: MatchResult): any => {
     const route = matchResult?.route;
@@ -273,8 +271,11 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
 
   const Switch: any = (_: any, childrenRoutes: RouteEntry[]): any => {
     devDebug(`switch render: ${state.url.pathname}`);
-    const matchResult = match(childrenRoutes);
+    const matchResult = match(state.url, childrenRoutes);
     const matchedViewChildren = getRouteChildren(matchResult);
+
+    const activeMatchResult = match(urlFromHref(loc.href), childrenRoutes);
+    const hasRouteEntryChanged = activeMatchResult?.index !== matchResult?.index;
 
     if (matchedViewChildren) {
       if (Build.isServer) {
@@ -282,7 +283,7 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
         return matchedViewChildren;
       }
 
-      createSwitchChildren(matchedViewChildren);
+      createSwitchChildren(matchedViewChildren, hasRouteEntryChanged);
 
       return state.views.map(v => v.c);
     }
@@ -291,10 +292,10 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
   const router: Router = (defaultRouter = {
     Switch,
     get url() {
-      return urlFromHref(activeUrl.href);
+      return urlFromHref(loc.href);
     },
     get activePath() {
-      return activeUrl.pathname;
+      return urlFromHref(loc.href).pathname;
     },
     push: setUrl,
     onChange: cb => onChangeCallacks.push(cb),
@@ -323,6 +324,8 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
     },
     serializeURL,
   });
+
+  // hstry.scrollRestoration = 'manual';
 
   // listen URL changes
   win.addEventListener('popstate', navigationChanged);

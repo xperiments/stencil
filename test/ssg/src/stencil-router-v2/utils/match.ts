@@ -39,19 +39,33 @@ const compilePath = (pattern: Path, options: CompileOptions): { re: RegExp; keys
 export const match = (pathname: string, options: MatchOptions = {}) => {
   const { exact = false, strict = false } = options;
   const { re, keys } = compilePath(pathname, { end: exact, strict });
+
   return (path: string) => {
     const match = re.exec(path);
     if (!match) {
       return undefined;
     }
     const [url, ...values] = match;
-    const isExact = path === url;
-    if (exact && !isExact) {
+    if (exact && path !== url) {
       return undefined;
     }
     return keys.reduce((memo, key: Key, index) => {
       memo[key.name] = values[index];
       return memo;
     }, {} as { [key: string]: string });
+  };
+};
+
+export const matchAny = (pathnames: string[], options: MatchOptions = {}) => {
+  const matchFns = pathnames.map(pathname => match(pathname, options));
+  return (path: string) => {
+    let result: { [key: string]: string };
+    for (const matchFn of matchFns) {
+      result = matchFn(path);
+      if (result) {
+        break;
+      }
+    }
+    return result;
   };
 };
