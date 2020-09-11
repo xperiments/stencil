@@ -34,6 +34,24 @@ describe('serializeNodeToHtml', () => {
     expect(html).toBe(`<pre><code><span>88</span></code></pre>`);
   });
 
+  it('do not pretty print <pre><code> w/ highlights and new', () => {
+    const elm = doc.createElement('div');
+
+    elm.innerHTML = `<pre><code><span>install</span> cordova-plugin-purchase\nnpx cap update</code></pre>`;
+
+    const html = serializeNodeToHtml(elm, { prettyHtml: true });
+    expect(html).toBe(`<pre><code><span>install</span> cordova-plugin-purchase\nnpx cap update</code></pre>`);
+  });
+
+  it('do not pretty print <pre><code> w/ html comments', () => {
+    const elm = doc.createElement('div');
+
+    elm.innerHTML = `<pre><code><span><!--a-->88</span>c<!--b--></code></pre>`;
+
+    const html = serializeNodeToHtml(elm, { prettyHtml: true });
+    expect(html).toBe(`<pre><code><span><!--a-->88</span>c<!--b--></code></pre>`);
+  });
+
   it('do not pretty print <script>', () => {
     const elm = doc.createElement('div');
 

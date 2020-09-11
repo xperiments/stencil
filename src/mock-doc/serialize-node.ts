@@ -306,7 +306,7 @@ function serializeToHtml(node: Node, opts: SerializeNodeToHtmlOptions, output: S
       } else {
         // this text node has text content
         const isWithinWhitespaceSensitiveNode =
-          opts.newLines || opts.indentSpaces > 0 ? isWithinWhitespaceSensitive(node) : false;
+          opts.newLines || opts.indentSpaces > 0 || opts.prettyHtml ? isWithinWhitespaceSensitive(node) : false;
         if (opts.newLines && !isWithinWhitespaceSensitiveNode) {
           output.text.push('\n');
           output.currentLineWidth = 0;
@@ -339,7 +339,7 @@ function serializeToHtml(node: Node, opts: SerializeNodeToHtmlOptions, output: S
             output.currentLineWidth += textContentLength;
           } else {
             // this text node is going into a normal element and html can be escaped
-            if (opts.prettyHtml) {
+            if (opts.prettyHtml && !isWithinWhitespaceSensitiveNode) {
               // pretty print the text node
               output.text.push(escapeString(textContent.replace(/\s\s+/g, ' ').trim(), false));
               output.currentLineWidth += textContentLength;
@@ -391,12 +391,14 @@ function serializeToHtml(node: Node, opts: SerializeNodeToHtmlOptions, output: S
       }
     }
 
-    if (opts.newLines) {
+    const isWithinWhitespaceSensitiveNode =
+      opts.newLines || opts.indentSpaces > 0 ? isWithinWhitespaceSensitive(node) : false;
+    if (opts.newLines && !isWithinWhitespaceSensitiveNode) {
       output.text.push('\n');
       output.currentLineWidth = 0;
     }
 
-    if (opts.indentSpaces > 0) {
+    if (opts.indentSpaces > 0 && !isWithinWhitespaceSensitiveNode) {
       for (let i = 0; i < output.indent; i++) {
         output.text.push(' ');
       }
