@@ -107,7 +107,7 @@ export const getRollupOptions = (
         ...config.commonjs,
       }),
       ...afterPlugins,
-      pluginHelper(config, buildCtx),
+      pluginHelper(config, buildCtx, bundleOpts.platform),
       rollupJsonPlugin({
         preferConst: true,
       }),
