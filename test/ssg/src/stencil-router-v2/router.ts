@@ -336,6 +336,16 @@ export const createWindowRouter = (win: Window, doc: Document, loc: Location, hs
 };
 
 export const href = (href: string, router: Router | undefined = defaultRouter) => {
+  if (typeof href !== 'string') {
+    return {};
+  }
+
+  if (href.startsWith('#')) {
+    return {
+      href,
+    };
+  }
+
   const goToUrl = urlFromHref(href);
 
   if (Build.isDev) {

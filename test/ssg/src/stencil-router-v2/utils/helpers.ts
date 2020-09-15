@@ -9,7 +9,7 @@ export const isString = (v: any): v is string => typeof v === 'string';
 
 export const normalizePathname = (url: URL | Location) => url.pathname.toLowerCase();
 
-export const urlFromHref = (href: string) => new URL(href, document.baseURI);
+export const urlFromHref = (href: string) => new URL(href.split('#')[0], document.baseURI);
 
 export const serializeURL = (url: URL) => url.pathname + url.search + url.hash;
 
