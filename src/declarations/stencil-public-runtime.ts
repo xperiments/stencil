@@ -496,13 +496,13 @@ export declare const Fragment: FunctionalComponent<{}>;
  */
 export declare namespace h {
   export function h(sel: any): VNode;
-  export function h(sel: Node, data: VNodeData): VNode;
-  export function h(sel: any, data: VNodeData): VNode;
+  export function h(sel: Node, data: VNodeData | null): VNode;
+  export function h(sel: any, data: VNodeData | null): VNode;
   export function h(sel: any, text: string): VNode;
   export function h(sel: any, children: Array<VNode | undefined | null>): VNode;
-  export function h(sel: any, data: VNodeData, text: string): VNode;
-  export function h(sel: any, data: VNodeData, children: Array<VNode | undefined | null>): VNode;
-  export function h(sel: any, data: VNodeData, children: VNode): VNode;
+  export function h(sel: any, data: VNodeData | null, text: string): VNode;
+  export function h(sel: any, data: VNodeData | null, children: Array<VNode | undefined | null>): VNode;
+  export function h(sel: any, data: VNodeData | null, children: VNode): VNode;
 
   export namespace JSX {
     interface IntrinsicElements extends LocalJSX.IntrinsicElements, JSXBase.IntrinsicElements {
@@ -512,13 +512,13 @@ export declare namespace h {
 }
 
 export declare function h(sel: any): VNode;
-export declare function h(sel: Node, data: VNodeData): VNode;
-export declare function h(sel: any, data: VNodeData): VNode;
+export declare function h(sel: Node, data: VNodeData | null): VNode;
+export declare function h(sel: any, data: VNodeData | null): VNode;
 export declare function h(sel: any, text: string): VNode;
 export declare function h(sel: any, children: Array<VNode | undefined | null>): VNode;
-export declare function h(sel: any, data: VNodeData, text: string): VNode;
-export declare function h(sel: any, data: VNodeData, children: Array<VNode | undefined | null>): VNode;
-export declare function h(sel: any, data: VNodeData, children: VNode): VNode;
+export declare function h(sel: any, data: VNodeData | null, text: string): VNode;
+export declare function h(sel: any, data: VNodeData | null, children: Array<VNode | undefined | null>): VNode;
+export declare function h(sel: any, data: VNodeData | null, children: VNode): VNode;
 
 export interface VNode {
   $flags$: number;
