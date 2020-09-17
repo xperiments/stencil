@@ -1,5 +1,5 @@
 /**
- * Node builtin modules as of v14.2.0
+ * Node builtin modules as of v14.5.0
  */
 export const NODE_BUILTINS = [
   '_http_agent',
